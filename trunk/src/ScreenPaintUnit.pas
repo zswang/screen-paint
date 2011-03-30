@@ -110,6 +110,11 @@ type
   private
     { Private declarations }
     FLovelyPaint: TLovelyPaint21;
+    FPenWidth: Integer;
+    FPenColor: TColor;
+    FShapeTool: TShapeTools;
+    FShapeType: Byte;
+    FSelectModel: string;
     procedure AddNotifyIcon; //ÃÌº”Õ–≈ÃÕº±Í
     procedure WMICONEVENT(var Msg: TMessage); message WM_ICONEVENT;
     procedure WMSYSCOMMAND(var Msg: TWMSysCommand); message WM_SYSCOMMAND;
@@ -147,6 +152,10 @@ end;
 
 procedure TFormScreenPaint.FormCreate(Sender: TObject);
 begin
+  FPenWidth := 3;
+  FPenColor := clBlack;
+  FShapeTool := pstPaint;
+  FShapeType := stPen;
   Stop;
   AddNotifyIcon;
   RegisterHotKey(Handle, cHotKeyWinP, MOD_WIN, VK_P);
@@ -159,7 +168,7 @@ var
 begin
   vBitmap := TBitmap.Create;
   TakeDesktop(vBitmap, Screen.DesktopRect);
-  
+
   Top := 0;
   Left := 0;
   Width := Screen.Width;
@@ -173,9 +182,11 @@ begin
   FLovelyPaint.Clear;
   FLovelyPaint.VectorShapePath := CommonFunctions51.ExePath + 'vector';
   FLovelyPaint.SetBackGraphic(vBitmap);
-  FLovelyPaint.SelectShape := stPen;
-  FLovelyPaint.SelectTools := pstPaint;
-  FLovelyPaint.SelectPenWidth := 3;
+  FLovelyPaint.SelectShape := FShapeType;
+  FLovelyPaint.SelectPenColor := FPenColor;
+  FLovelyPaint.SelectTools := FShapeTool;
+  FLovelyPaint.SelectPenWidth := FPenWidth;
+  FLovelyPaint.SelectModel := FSelectModel;
   FLovelyPaint.IsScreenPaint := True;
   FLovelyPaint.PopupMenu := PopupMenuPaint;
   vBitmap.Free;
@@ -273,6 +284,8 @@ begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstPaint;
   FLovelyPaint.SelectShape := stPen;
+  FShapeTool := FLovelyPaint.SelectTools;
+  FShapeType := FLovelyPaint.SelectShape;
 end;
 
 procedure TFormScreenPaint.ActionLineExecute(Sender: TObject);
@@ -280,6 +293,8 @@ begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstPaint;
   FLovelyPaint.SelectShape := stLine;
+  FShapeTool := FLovelyPaint.SelectTools;
+  FShapeType := FLovelyPaint.SelectShape;
 end;
 
 procedure TFormScreenPaint.ActionRectangleExecute(Sender: TObject);
@@ -287,6 +302,8 @@ begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstPaint;
   FLovelyPaint.SelectShape := stHollowRectangle;
+  FShapeTool := FLovelyPaint.SelectTools;
+  FShapeType := FLovelyPaint.SelectShape;
 end;
 
 procedure TFormScreenPaint.ActionArrowExecute(Sender: TObject);
@@ -294,6 +311,8 @@ begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstPaint;
   FLovelyPaint.SelectShape := stSingleArrow;
+  FShapeTool := FLovelyPaint.SelectTools;
+  FShapeType := FLovelyPaint.SelectShape;
 end;
 
 procedure TFormScreenPaint.ActionTextExecute(Sender: TObject);
@@ -301,13 +320,18 @@ begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstPaint;
   FLovelyPaint.SelectShape := stEdit;
+  FShapeTool := FLovelyPaint.SelectTools;
+  FShapeType := FLovelyPaint.SelectShape;
 end;
 
 procedure TFormScreenPaint.ActionMoreShapeExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstPaint;
-  FLovelyPaint.SelectVectorShape;
+  if not FLovelyPaint.SelectVectorShape then Exit;
+  FShapeTool := FLovelyPaint.SelectTools;
+  FShapeType := FLovelyPaint.SelectShape;
+  FSelectModel := FLovelyPaint.SelectModel;
 end;
 
 procedure TFormScreenPaint.ActionEllipseExecute(Sender: TObject);
@@ -321,35 +345,35 @@ procedure TFormScreenPaint.ActionBlackExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clBlack;
-  FLovelyPaint.SelectTextColor := clBlack;
+  FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
 procedure TFormScreenPaint.ActionRedExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clRed;
-  FLovelyPaint.SelectTextColor := clRed;
+  FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
 procedure TFormScreenPaint.ActionGreenExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clGreen;
-  FLovelyPaint.SelectTextColor := clGreen;
+  FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
 procedure TFormScreenPaint.ActionSkyExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clSkyBlue;
-  FLovelyPaint.SelectTextColor := clSkyBlue;
+  FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
 procedure TFormScreenPaint.ActionWhiteExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clWhite;
-  FLovelyPaint.SelectTextColor := clWhite;
+  FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
 procedure TFormScreenPaint.ActionMoreColorExecute(Sender: TObject);
@@ -358,37 +382,42 @@ begin
   ColorDialogOne.Color := FLovelyPaint.SelectPenColor;
   if not ColorDialogOne.Execute then Exit;
   FLovelyPaint.SelectPenColor := ColorDialogOne.Color;
-  FLovelyPaint.SelectTextColor := ColorDialogOne.Color;
+  FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
 procedure TFormScreenPaint.Action3PixelExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenWidth := 3;
+  FPenWidth := FLovelyPaint.SelectPenWidth;
 end;
 
 procedure TFormScreenPaint.Action4PixelExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenWidth := 4;
+  FPenWidth := FLovelyPaint.SelectPenWidth;
 end;
 
 procedure TFormScreenPaint.Action5PixelExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenWidth := 5;
+  FPenWidth := FLovelyPaint.SelectPenWidth;
 end;
 
 procedure TFormScreenPaint.Action6PixelExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenWidth := 6;
+  FPenWidth := FLovelyPaint.SelectPenWidth;
 end;
 
 procedure TFormScreenPaint.ActionModifyExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstModify;
+  FShapeTool := FLovelyPaint.SelectTools;
 end;
 
 end.

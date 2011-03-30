@@ -29,11 +29,8 @@ object FormScreenPaint: TFormScreenPaint
     object N3: TMenuItem
       Caption = '-'
     end
-    object N4: TMenuItem
-      Caption = #24555#25463#38190
-    end
-    object N1: TMenuItem
-      Caption = #27714#20851#27880
+    object MenuItemBlog: TMenuItem
+      Action = ActionBlog
     end
     object N2: TMenuItem
       Caption = '-'
@@ -295,6 +292,10 @@ object FormScreenPaint: TFormScreenPaint
       Caption = #32534#36753
       ShortCut = 77
       OnExecute = ActionModifyExecute
+    end
+    object ActionBlog: TAction
+      Caption = #27714#20851#27880
+      OnExecute = ActionBlogExecute
     end
   end
   object TimerPlay: TTimer

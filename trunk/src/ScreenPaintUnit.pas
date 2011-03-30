@@ -54,10 +54,9 @@ type
     ActionPlay: TAction;
     ActionClose: TAction;
     MenuItem6Pixel: TMenuItem;
-    N1: TMenuItem;
+    MenuItemBlog: TMenuItem;
     N2: TMenuItem;
     N3: TMenuItem;
-    N4: TMenuItem;
     ActionStop: TAction;
     TimerPlay: TTimer;
     ActionPen: TAction;
@@ -83,6 +82,7 @@ type
     MenuItemModify: TMenuItem;
     ActionModify: TAction;
     ColorDialogOne: TColorDialog;
+    ActionBlog: TAction;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure ActionPlayExecute(Sender: TObject);
@@ -107,6 +107,7 @@ type
     procedure Action5PixelExecute(Sender: TObject);
     procedure Action6PixelExecute(Sender: TObject);
     procedure ActionModifyExecute(Sender: TObject);
+    procedure ActionBlogExecute(Sender: TObject);
   private
     { Private declarations }
     FLovelyPaint: TLovelyPaint21;
@@ -418,6 +419,11 @@ begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstModify;
   FShapeTool := FLovelyPaint.SelectTools;
+end;
+
+procedure TFormScreenPaint.ActionBlogExecute(Sender: TObject);
+begin
+  ShellExecute(Handle, nil, 'http://t.sina.com.cn/zswang', nil, nil, SW_SHOW);
 end;
 
 end.

@@ -456,6 +456,7 @@ type
     FFormVectorSelectBox: TFormVectorSelectBox; // 矢量图选择框
 
     FTimerLaser: TTimer; // 光笔动画的计时器
+    FTimerScroll: TTimer; // 滚动计时器
     FLaserDownPoint: TPoint; // 光笔按下的地方
     FLaserDownCount: Integer; // 光笔按下的变化参数
     FBorder: TPoint; // 边线
@@ -497,6 +498,8 @@ type
     procedure SetAdaptStyle(const Value: TAdaptStyle);
     procedure SetVectorShapePath(const Value: string);
     procedure TimerLaserTimer(Sender: TObject);
+    procedure TimerScrollTimer(Sender: TObject);
+
     procedure SetBorderWidth(const Value: Integer);
     procedure SetCanReangle(const Value: Boolean);
   protected
@@ -1518,6 +1521,11 @@ begin
   FTimerLaser.Interval := 40;
   FTimerLaser.OnTimer := TimerLaserTimer;
 
+  FTimerScroll := TTimer.Create(nil);
+  FTimerScroll.Enabled := False;
+  FTimerScroll.Interval := 200;
+  FTimerScroll.OnTimer := TimerScrollTimer;
+
   FZoomBitmap := TBitmap.Create;
   FZoomBitmap.PixelFormat := pf24bit;                                           //2007-10-25 ZswangY37 No.1
 
@@ -1617,6 +1625,7 @@ end;
 destructor TLovelyPaint21.Destroy;
 begin
   if Assigned(FTimerLaser) then FTimerLaser.Free;
+  if Assigned(FTimerScroll) then FTimerScroll.Free;
   if Assigned(FShapeList) then FShapeList.Free;
   if Assigned(FCommandList) then FCommandList.Free;
   if Assigned(FCommandRedo) then FCommandRedo.Free;
@@ -2159,7 +2168,7 @@ begin
       end;
     VK_A:
       case FSelectTools of
-        pstModify: if ssCtrl in Shift then SelectAll;
+        pstModify, pstPaint: if ssCtrl in Shift then SelectAll;
       end;
     VK_DELETE: Delete;
     VK_ESCAPE:
@@ -2357,7 +2366,8 @@ procedure TLovelyPaint21.LPCANSELECTALL(var Msg: TMessage);
 begin
   if FModifyShape is TCustomShapeText then
     Msg.Result := Ord(TCustomShapeText(FModifyShape).Text <> '')
-  else Msg.Result := Ord((SelectTools = pstModify) and (FShapeList.Count > 0));
+  else Msg.Result := Ord((SelectTools in [pstModify, pstPaint]) and (FShapeList.Count > 0) and
+    (FShapeList.Count > FShapeList.SelectCount));
 end;
 
 procedure TLovelyPaint21.LPCANUNDO(var Msg: TMessage);
@@ -3495,6 +3505,8 @@ procedure TLovelyPaint21.SelectAll;
 var
   I: Integer;
 begin
+  ShapeAccept;
+  if SelectTools = pstPaint then SelectTools := pstModify;
   for I := 0 to FShapeList.Count - 1 do
     FShapeList[I].Selected := True;
   DrawShape;
@@ -4006,6 +4018,11 @@ begin
     DrawPaint;
     PaintThis;
   end;
+end;
+
+procedure TLovelyPaint21.TimerScrollTimer(Sender: TObject);
+begin
+  //
 end;
 
 function TLovelyPaint21.Undo: Boolean;

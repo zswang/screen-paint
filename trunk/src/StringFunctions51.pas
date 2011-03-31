@@ -1,6 +1,6 @@
 (*//
-项目:LovelyComponents.CommonFunctions
-版本:2.0
+项目:LovelyComponents.StringFunctions
+版本:5.01
 标题:字符串处理单元
 说明:针对字符处理的函数进行封装
 日期:2004-07-03

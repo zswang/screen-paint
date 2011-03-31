@@ -6,6 +6,17 @@
 支持：wjhu111#21cn.com
 //*)
 
+//*******Begin 修改日志*******//
+//----------------------------------------------------------------------1.00.002
+//2011-03-30 ZswangY37 No.1 建立 右键菜单，选择颜色、图形、粗细、编辑模式
+//----------------------------------------------------------------------1.00.003
+//2011-03-31 ZswangY37 No.1 完善 显示时控件获得焦点
+//2011-03-31 ZswangY37 No.2 完善 修改模式不做状态保存
+//----------------------------------------------------------------------1.00.004
+//2011-04-01 ZswangY37 No.1 完善 快捷键加上alt避免文字输入时冲突
+//2011-04-01 ZswangY37 No.2 完善 只能启动一个实例
+//*******End 修改日志*******//
+
 unit ScreenPaintUnit;
 
 interface
@@ -16,11 +27,14 @@ uses
 
 const
   WM_ICONEVENT = WM_USER + 10; //托盘图标消息
-  MY_PLAY = WM_USER + $1001; //启动
+  MY_PLAY = WM_USER + $5001; //启动
 
 const cIconIdent = 4587;
 const cHotKeyWinP = 1007;
 const cHotKeyWinZ = 1008;
+
+const
+  cFileExt = '.paint';
 
 var
   WM_TASKBARCREATED: DWORD; //任务拦重建消息
@@ -83,6 +97,27 @@ type
     ActionModify: TAction;
     ColorDialogOne: TColorDialog;
     ActionBlog: TAction;
+    ActionSaveToFile: TAction;
+    OpenDialogOne: TOpenDialog;
+    SaveDialogOne: TSaveDialog;
+    ActionFileShell: TAction;
+    MenuItemEdit: TMenuItem;
+    ActionCopy: TAction;
+    ActionPaste: TAction;
+    ActionUndo: TAction;
+    ActionRedo: TAction;
+    ActionCut: TAction;
+    ActionDelete: TAction;
+    ActionSelectAll: TAction;
+    N1: TMenuItem;
+    N4: TMenuItem;
+    N6: TMenuItem;
+    N7: TMenuItem;
+    MenuItemSelectAll: TMenuItem;
+    N11: TMenuItem;
+    N15: TMenuItem;
+    N16: TMenuItem;
+    N17: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure ActionPlayExecute(Sender: TObject);
@@ -108,6 +143,16 @@ type
     procedure Action6PixelExecute(Sender: TObject);
     procedure ActionModifyExecute(Sender: TObject);
     procedure ActionBlogExecute(Sender: TObject);
+    procedure ActionFileShellExecute(Sender: TObject);
+    procedure ActionListOneUpdate(Action: TBasicAction;
+      var Handled: Boolean);
+    procedure ActionCopyExecute(Sender: TObject);
+    procedure ActionCutExecute(Sender: TObject);
+    procedure ActionDeleteExecute(Sender: TObject);
+    procedure ActionSelectAllExecute(Sender: TObject);
+    procedure ActionPasteExecute(Sender: TObject);
+    procedure ActionUndoExecute(Sender: TObject);
+    procedure ActionRedoExecute(Sender: TObject);
   private
     { Private declarations }
     FLovelyPaint: TLovelyPaint21;
@@ -116,11 +161,16 @@ type
     FShapeTool: TShapeTools;
     FShapeType: Byte;
     FSelectModel: string;
+    FRegistryShell: Boolean;
     procedure AddNotifyIcon; //添加托盘图标
     procedure WMICONEVENT(var Msg: TMessage); message WM_ICONEVENT;
     procedure WMSYSCOMMAND(var Msg: TWMSysCommand); message WM_SYSCOMMAND;
     procedure WMHOTKEY(var Msg: TWMHOTKEY); message WM_HOTKEY;
     procedure MYPLAY(var Msg: TMessage); message MY_PLAY; // 让右键菜单消逝
+
+    function IsRegistryShell: Boolean;
+    procedure RegistryShell;
+    procedure UnregistryShell;
   public
     { Public declarations }
     procedure ReloadScreen;
@@ -135,7 +185,8 @@ implementation
 
 {$R *.dfm}
 
-uses CommonFunctions51, GraphicFunctions51, ShapeUtils21, ShellAPI;
+uses CommonFunctions51, GraphicFunctions51, ShapeUtils21, ShellAPI,
+  Registry, ShlObj;
 
 procedure TFormScreenPaint.AddNotifyIcon;
 var
@@ -153,6 +204,12 @@ end;
 
 procedure TFormScreenPaint.FormCreate(Sender: TObject);
 begin
+  Font.Assign(Screen.MenuFont);
+  Application.Title := vModuleVersionInfomation.rProductName + '-' +
+    vModuleVersionInfomation.rProductVersion;
+  Application.HelpFile := ChangeFileExt(ParamStr(0), '.hlp');
+  Caption := Application.Title;
+
   FPenWidth := 3;
   FPenColor := clBlack;
   FShapeTool := pstPaint;
@@ -190,6 +247,7 @@ begin
   FLovelyPaint.SelectModel := FSelectModel;
   FLovelyPaint.IsScreenPaint := True;
   FLovelyPaint.PopupMenu := PopupMenuPaint;
+  ActiveControl := FLovelyPaint;
   vBitmap.Free;
 end;
 
@@ -320,7 +378,7 @@ procedure TFormScreenPaint.ActionTextExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectTools := pstPaint;
-  FLovelyPaint.SelectShape := stEdit;
+  FLovelyPaint.SelectShape := stMemo;
   FShapeTool := FLovelyPaint.SelectTools;
   FShapeType := FLovelyPaint.SelectShape;
 end;
@@ -417,13 +475,134 @@ end;
 procedure TFormScreenPaint.ActionModifyExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
-  FLovelyPaint.SelectTools := pstModify;
-  FShapeTool := FLovelyPaint.SelectTools;
+  if TAction(Sender).Checked then
+    FLovelyPaint.SelectTools := pstModify
+  else FLovelyPaint.SelectTools := pstPaint;
 end;
 
 procedure TFormScreenPaint.ActionBlogExecute(Sender: TObject);
 begin
   ShellExecute(Handle, nil, 'http://t.sina.com.cn/zswang', nil, nil, SW_SHOW);
+end;
+
+function TFormScreenPaint.IsRegistryShell: Boolean;
+begin
+  Result := False;
+  with TRegistry.Create() do try
+    RootKey := HKEY_CLASSES_ROOT;
+    if not OpenKey(cFileExt, False) then Exit;
+    CloseKey;
+    if not OpenKey('Screen Paint\shell\open\command', False) then Exit;
+    if not SameText(ParamStr(0) + ' "%1"', ReadString('')) then Exit;
+  finally
+    Free;
+  end;
+  Result := True;
+end;
+
+procedure TFormScreenPaint.RegistryShell;
+begin
+  FRegistryShell := True;
+  with TRegistry.Create do try
+    RootKey := HKEY_CLASSES_ROOT;
+    OpenKey(cFileExt, True);
+    WriteString('', 'Screen Paint');
+    CloseKey;
+    OpenKey('Screen Paint\shell\open\command', True);
+    WriteString('', ParamStr(0) + ' "%1"');
+    CloseKey;
+    OpenKey('Screen Paint\DefaultIcon', True);
+    WriteString('', ParamStr(0) + ',0');
+  finally
+    Free;
+  end;
+  SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST or SHCNF_FLUSH, nil, nil);
+end;
+
+procedure TFormScreenPaint.UnregistryShell;
+var
+  vChangeRegistry: Boolean;
+begin
+  FRegistryShell := False;
+  with TRegistry.Create do try
+    RootKey := HKEY_CLASSES_ROOT;
+    vChangeRegistry := DeleteKey(cFileExt) and DeleteKey('Screen Paint');
+  finally
+    Free;
+  end;
+  if vChangeRegistry then
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST or SHCNF_FLUSH, nil, nil);
+end;
+
+procedure TFormScreenPaint.ActionFileShellExecute(Sender: TObject);
+begin
+  if IsRegistryShell then
+    UnregistryShell
+  else RegistryShell;
+end;
+
+procedure TFormScreenPaint.ActionListOneUpdate(Action: TBasicAction;
+  var Handled: Boolean);
+begin
+  ActionCopy.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANCOPY, 0, 0) <> 0);
+  ActionCut.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANCUT, 0, 0) <> 0);
+  ActionSelectAll.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANSELECTALL, 0, 0) <> 0);
+  ActionDelete.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANDELETE, 0, 0) <> 0);
+  ActionPaste.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANPASTE, 0, 0) <> 0);
+  ActionUndo.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANUNDO, 0, 0) <> 0);
+  ActionRedo.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANREDO, 0, 0) <> 0);
+
+  if FRegistryShell then
+  begin
+    ActionFileShell.Caption := '取消关联';
+    ActionFileShell.Hint := Format('取消关联|取消"%s"文件关联', [cFileExt]);
+  end else
+  begin
+    ActionFileShell.Caption := '文件关联';
+    ActionFileShell.Hint := Format('文件关联|注册"%s"文件关联', [cFileExt]);
+  end;
+end;
+
+procedure TFormScreenPaint.ActionCopyExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  SendMessage(FLovelyPaint.Handle, LP_COPY, 0, 0);
+end;
+
+procedure TFormScreenPaint.ActionCutExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  SendMessage(FLovelyPaint.Handle, LP_CUT, 0, 0);
+end;
+
+procedure TFormScreenPaint.ActionDeleteExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  SendMessage(FLovelyPaint.Handle, LP_DELETE, 0, 0);
+end;
+
+procedure TFormScreenPaint.ActionSelectAllExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  SendMessage(FLovelyPaint.Handle, LP_SELECTALL, 0, 0);
+end;
+
+procedure TFormScreenPaint.ActionPasteExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  SendMessage(FLovelyPaint.Handle, LP_PASTE, 0, 0);
+end;
+
+procedure TFormScreenPaint.ActionUndoExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  SendMessage(FLovelyPaint.Handle, LP_UNDO, 0, 0);
+end;
+
+procedure TFormScreenPaint.ActionRedoExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  SendMessage(FLovelyPaint.Handle, LP_REDO, 0, 0);
 end;
 
 end.

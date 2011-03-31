@@ -2,7 +2,7 @@
 项目:LovelyComponents.CommonFunctions
 版本:5.01
 标题:通用单元
-说明:搜索通用函数或者是不能准确分类的函数
+说明:搜集通用函数或者是不能准确分类的函数
 日期:2004-06-16
 支持:jihu.wang#gmail.com
 设计:ZswangY37

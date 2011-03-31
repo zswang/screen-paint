@@ -121,8 +121,39 @@ object FormScreenPaint: TFormScreenPaint
         AutoCheck = True
       end
     end
+    object MenuItemEdit: TMenuItem
+      Caption = #32534#36753
+      object N1: TMenuItem
+        Action = ActionCopy
+      end
+      object N4: TMenuItem
+        Action = ActionPaste
+      end
+      object N6: TMenuItem
+        Action = ActionCut
+      end
+      object N16: TMenuItem
+        Caption = '-'
+      end
+      object MenuItemSelectAll: TMenuItem
+        Action = ActionSelectAll
+      end
+      object N7: TMenuItem
+        Action = ActionDelete
+      end
+      object N17: TMenuItem
+        Caption = '-'
+      end
+      object N11: TMenuItem
+        Action = ActionUndo
+      end
+      object N15: TMenuItem
+        Action = ActionRedo
+      end
+    end
     object MenuItemModify: TMenuItem
       Action = ActionModify
+      AutoCheck = True
     end
     object MenuItemRestore: TMenuItem
       Action = ActionStop
@@ -135,11 +166,36 @@ object FormScreenPaint: TFormScreenPaint
     end
   end
   object ActionListOne: TActionList
+    OnUpdate = ActionListOneUpdate
     Left = 88
     Top = 8
+    object ActionCopy: TAction
+      Category = 'Edit'
+      Caption = #22797#21046
+      OnExecute = ActionCopyExecute
+    end
+    object ActionCut: TAction
+      Tag = 1
+      Category = 'Edit'
+      Caption = #21098#20999
+      OnExecute = ActionCutExecute
+    end
     object ActionPlay: TAction
       Caption = #21551#29992#23631#24149#30011#26495' '#12304'Win+P'#12305
       OnExecute = ActionPlayExecute
+    end
+    object ActionDelete: TAction
+      Tag = 2
+      Category = 'Edit'
+      Caption = #21024#38500
+      OnExecute = ActionDeleteExecute
+    end
+    object ActionSelectAll: TAction
+      Tag = 3
+      Category = 'Edit'
+      Caption = #20840#36873
+      OnExecute = ActionSelectAllExecute
+      OnUpdate = Action3PixelExecute
     end
     object ActionClose: TAction
       Caption = #20851#38381
@@ -156,7 +212,7 @@ object FormScreenPaint: TFormScreenPaint
       Caption = #31508#21047
       Checked = True
       GroupIndex = 3
-      ShortCut = 80
+      ShortCut = 32848
       OnExecute = ActionPenExecute
     end
     object ActionLine: TAction
@@ -164,7 +220,7 @@ object FormScreenPaint: TFormScreenPaint
       AutoCheck = True
       Caption = #30452#32447
       GroupIndex = 3
-      ShortCut = 76
+      ShortCut = 32844
       OnExecute = ActionLineExecute
     end
     object ActionRectangle: TAction
@@ -172,7 +228,7 @@ object FormScreenPaint: TFormScreenPaint
       AutoCheck = True
       Caption = #30697#24418
       GroupIndex = 3
-      ShortCut = 82
+      ShortCut = 32850
       OnExecute = ActionRectangleExecute
     end
     object ActionArrow: TAction
@@ -180,7 +236,7 @@ object FormScreenPaint: TFormScreenPaint
       AutoCheck = True
       Caption = #31661#22836
       GroupIndex = 3
-      ShortCut = 65
+      ShortCut = 32833
       OnExecute = ActionArrowExecute
     end
     object ActionText: TAction
@@ -188,8 +244,7 @@ object FormScreenPaint: TFormScreenPaint
       AutoCheck = True
       Caption = #25991#23383
       GroupIndex = 3
-      ShortCut = 84
-      Visible = False
+      ShortCut = 32852
       OnExecute = ActionTextExecute
     end
     object ActionMoreShape: TAction
@@ -204,7 +259,7 @@ object FormScreenPaint: TFormScreenPaint
       AutoCheck = True
       Caption = #22278#24418
       GroupIndex = 3
-      ShortCut = 69
+      ShortCut = 32837
       OnExecute = ActionEllipseExecute
     end
     object ActionBlack: TAction
@@ -289,13 +344,41 @@ object FormScreenPaint: TFormScreenPaint
       OnExecute = Action6PixelExecute
     end
     object ActionModify: TAction
-      Caption = #32534#36753
-      ShortCut = 77
+      AutoCheck = True
+      Caption = #20462#25913'/'#32472#21046
+      ShortCut = 32845
       OnExecute = ActionModifyExecute
     end
     object ActionBlog: TAction
       Caption = #27714#20851#27880
       OnExecute = ActionBlogExecute
+    end
+    object ActionSaveToFile: TAction
+      Category = 'Shape'
+      Caption = 'ActionSaveToFile'
+    end
+    object ActionFileShell: TAction
+      Category = 'Shape'
+      Caption = #25991#20214#20851#32852
+      OnExecute = ActionFileShellExecute
+    end
+    object ActionPaste: TAction
+      Tag = 4
+      Category = 'Edit'
+      Caption = #31896#36148
+      OnExecute = ActionPasteExecute
+    end
+    object ActionUndo: TAction
+      Tag = 5
+      Category = 'Edit'
+      Caption = #25764#38144
+      OnExecute = ActionUndoExecute
+    end
+    object ActionRedo: TAction
+      Tag = 6
+      Category = 'Edit'
+      Caption = #37325#22797
+      OnExecute = ActionRedoExecute
     end
   end
   object TimerPlay: TTimer
@@ -307,6 +390,14 @@ object FormScreenPaint: TFormScreenPaint
   object ColorDialogOne: TColorDialog
     Ctl3D = True
     Left = 152
+    Top = 8
+  end
+  object OpenDialogOne: TOpenDialog
+    Left = 184
+    Top = 8
+  end
+  object SaveDialogOne: TSaveDialog
+    Left = 216
     Top = 8
   end
 end

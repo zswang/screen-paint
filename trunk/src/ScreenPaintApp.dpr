@@ -55,6 +55,8 @@ var
   vProcessEntry32: TProcessEntry32;
   vExeName: string;
   vProcessWindowInfo: TProcessWindowInfo;
+  vAtom: TAtom;
+  vResult: THandle;
 begin
   ///////Begin 检查是否已经开启了程序                                           //2011-04-01 ZswangY37 No.2
   vExeName := ExtractFileName(ParamStr(0));
@@ -72,7 +74,14 @@ begin
           EnumWindows(@EnumWindowsProc, Integer(@vProcessWindowInfo));
           if vProcessWindowInfo.rWindowHandle <> 0 then
           begin
-            PostMessage(vProcessWindowInfo.rWindowHandle, MY_PLAY, 0, 0);
+            if ParamStr(1) <> '' then // 传递程序参数
+            begin
+              { TODO -c2006.10.18 -oZswangY32 : 检查程序参数的正确性 }
+              vAtom := GlobalAddAtom(PChar(ParamStr(1)));
+              SendMessageTimeOut(vProcessWindowInfo.rWindowHandle, MY_PLAY,
+                vAtom, GetCurrentProcessId, SMTO_NORMAL, 1000, vResult);
+              GlobalDeleteAtom(vAtom);
+            end;
             Exit;
           end;
         end;

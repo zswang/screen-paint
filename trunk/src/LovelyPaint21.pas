@@ -130,8 +130,8 @@ const
 ///////End 外部编辑消息
 
 type
-  TShapeTools = (pstFollow, pstBrowse, pstPaint, pstModify, pstLabel, pstLaser);
-               //跟随       预览        绘制      修改状态  名字标注  光笔
+  TShapeTools = (pstFollow, pstBrowse, pstPaint, pstModify, pstLabel, pstLaser, pstPhoto);
+               //跟随       预览        绘制      修改状态  名字标注  光笔      截图
   TShapeCommand = (scClear, scPaint, scPaste, scMove, scDelete, scChange,
                  //清除     绘制     粘贴     移动    删除      图形改变
     scPenColor, scPenWidth, scTranslucency, scAngle, scReserve1, scReserve2, 
@@ -231,7 +231,7 @@ const
   cCommandInfoHeadSize = SizeOf(TCommandInfo) - SizeOf(Char);
 
 type
-  TDispatchType = (dtPageUp, dtPageDown, dtSelectTool);
+  TDispatchType = (dtPageUp, dtPageDown, dtSelectTool, dtPhoto);
 
 type
   TDispatchEvent = procedure(Sender: TObject; ADispatchType: TDispatchType; AParam: Integer) of object;
@@ -320,6 +320,8 @@ type
     constructor Create;
     destructor Destroy; override;
 
+    function SaveToStream(AStream: TStream): Boolean; // 保存到流中
+    function LoadFromStream(AStream: TStream): Boolean; // 从流中载入
     function IndexFromIdent(AIdent: Longword): Integer;
     function IndexFromCrc32(ACrc32: Longword; ASize: Integer): Integer;
     procedure Clear; // 清除全部数据
@@ -466,6 +468,7 @@ type
     FResourceList: TResourceList;
     FCanReangle: Boolean;
     FIsScreenPaint: Boolean;
+    FPhotoRect: TRect;
 
     procedure SetControlIdent(const Value: Word);
     procedure SetSelectTranslucency(const Value: Boolean);
@@ -965,6 +968,34 @@ begin
   Result := True;
 end;
 
+(*function TShapeList.LoadFromStream(AStream: TStream): Boolean;
+var
+  vShape: TCustomShape;
+  vShapeInfo: TShapeInfo;
+  vCount: Integer;
+  I: Integer;
+begin
+  Result := False;
+  if not Assigned(AStream) then Exit;
+  AStream.Read(vCount, SizeOf(vCount));
+  OutputDebugString(PChar(Format('．～%d', [vCount])));
+  Clear; // 清除全部图像
+  I := 0;
+  while (I < vCount) and (AStream.Read(vShapeInfo, cShapeInfoHeadSize) > 0) do
+  begin
+    { TODO -c2006.12.01 -oZswangY37 : 判断DataSize是否合法 }
+    vShape := NewShape(vShapeInfo.rType);
+    if Assigned(vShape) then
+    begin
+      AStream.Seek(-cShapeInfoHeadSize, soFromCurrent);
+      vShape.StreamRead(AStream);
+      Append(vShape);
+    end else AStream.Seek(vShapeInfo.rDataSize, soFromCurrent);
+    Inc(I);
+  end;
+  Result := True;
+end;*)
+
 procedure TShapeList.Offset(AOffset: TPoint);
 var
   I: Integer;
@@ -983,6 +1014,20 @@ begin
     TCustomShape(FShapes[I]).StreamWrite(AStream);
   Result := True;
 end;
+
+(*function TShapeList.SaveToStream(AStream: TStream): Boolean;
+var
+  I: Integer;
+  vCount: Integer;
+begin
+  Result := False;
+  if not Assigned(AStream) then Exit;
+  vCount := FShapes.Count;
+  AStream.Write(vCount, SizeOf(vCount));
+  for I := 0 to FShapes.Count - 1 do
+    TCustomShape(FShapes[I]).StreamWrite(AStream);
+  Result := True;
+end;*)
 
 procedure TShapeList.SelectAngle(AAngle: Byte);
 var
@@ -2149,6 +2194,10 @@ begin
     VK_V:
       case FSelectTools of
         pstModify: if ssCtrl in Shift then PasteFromClipboard;
+        pstPhoto: if (ssCtrl in Shift) then
+          begin
+            if PasteFromClipboard then SelectTools := pstModify;
+          end;
         pstPaint: if (ssCtrl in Shift) then
           begin
             if not Assigned(FModifyShape) and PasteFromClipboard then           //2007-12-07 ZswangY37 No.1
@@ -2315,7 +2364,7 @@ end;
 
 function TLovelyPaint21.LoadFromStream(AStream: TStream): Boolean;
 begin
-  Result := FShapeList.LoadFromStream(AStream);
+  Result := FShapeList.LoadFromStream(AStream); // and FResourceList.LoadFromStream(AStream);
   DrawShape;
   DrawCurrent;
   DrawPaint;
@@ -2789,6 +2838,16 @@ begin
             FOnLaserChange(Self, FLaserPoint, not FLaserActive);
         end;
       end;
+    pstPhoto:
+      begin
+        if FMouseDown then
+        begin
+          if not (ssLeft in Shift) then Exit;
+          FPhotoRect.TopLeft := FDownPoint;
+          FPhotoRect.BottomRight := vPoint;
+          PaintThis;
+        end;
+      end;
     pstModify:
       begin
         if FModifyShape is TCustomShapeText then
@@ -2959,6 +3018,7 @@ var
   vPoint: TPoint;
   vIdents: TIdents;
   vCommand: PCommandInfo;
+  vBitmap: TBitmap;
 begin
   inherited;
   FMouseDown := False;
@@ -3058,6 +3118,20 @@ begin
         ShapeAccept;
         PaintThis;
       end;
+    pstPhoto:
+      begin
+        if not IsRectEmpty(FPhotoRect) then // 非空
+        begin
+          vBitmap := TBitmap.Create;
+          try
+            TakeDesktop(vBitmap, FPhotoRect);
+            Clipboard.Assign(vBitmap);
+          finally
+            vBitmap.Free;
+          end;
+        end;
+        PaintThis;
+      end;
   end;
 end;
 
@@ -3149,6 +3223,14 @@ begin
   vRect.TopLeft := PointToMouse(Point(0, 0));
   vRect.BottomRight := PointToMouse(Point(FBackBitmap.Width, FBackBitmap.Height));
   Canvas.CopyRect(vRect, FPaintBitmap.Canvas, vRect);
+
+  if (FSelectTools = pstPhoto) and FMouseDown then
+  begin
+    Canvas.Pen.Style := psDot;
+    vRect.TopLeft := PointToMouse(FPhotoRect.TopLeft);
+    vRect.BottomRight := PointToMouse(FPhotoRect.BottomRight);
+    Canvas.Rectangle(vRect);
+  end;
 end;
 
 function TLovelyPaint21.PasteFromClipboard: Boolean;
@@ -3498,7 +3580,7 @@ end;
 
 function TLovelyPaint21.SaveToStream(AStream: TStream): Boolean;
 begin
-  Result := FShapeList.SaveToStream(AStream);
+  Result := FShapeList.SaveToStream(AStream); // and FResourceList.SaveToStream(AStream);
 end;
 
 procedure TLovelyPaint21.SelectAll;
@@ -3911,7 +3993,7 @@ var
 begin
   if not Assigned(FModifyShape) then Exit;
   case FSelectTools of
-    pstPaint, pstModify:
+    pstPaint, pstModify, pstPhoto:
       begin
         if FModifyShape.Accept then
         begin
@@ -5269,6 +5351,20 @@ begin
   Result := -1;
 end;
 
+function TResourceList.LoadFromStream(AStream: TStream): Boolean;
+var
+  vCount: Integer;
+  I: Integer;
+  vAppend: Boolean;
+begin
+  Result := False;
+  if not Assigned(AStream) then Exit;
+  AStream.Read(vCount, SizeOf(vCount));
+  for I := 0 to vCount - 1 do
+    ReadStream(AStream, vAppend);
+  Result := True;
+end;
+
 function TResourceList.NewResource(
   AData: Pointer;
   ASize: Integer): PResourceInfo;
@@ -5307,6 +5403,24 @@ begin
     AAppend := True;
   end else AStream.Seek(vResourceInfo.rSize, soFromCurrent);
   Result := I;
+end;
+
+function TResourceList.SaveToStream(AStream: TStream): Boolean;
+var
+  I: Integer;
+  vCount: Integer;
+  vResourceInfo: PResourceInfo;
+begin
+  Result := False;
+  if not Assigned(AStream) then Exit;
+  vCount := FResourceList.Count;
+  AStream.Write(vCount, SizeOf(vCount));
+  for I := 0 to FResourceList.Count - 1 do
+  begin
+    vResourceInfo := FResourceList[I];
+    AStream.Write(vResourceInfo^,
+      SizeOf(TResourceInfo) - SizeOf(Char) + vResourceInfo.rSize);
+  end;
 end;
 
 initialization

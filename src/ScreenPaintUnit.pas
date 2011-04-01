@@ -15,6 +15,9 @@
 //----------------------------------------------------------------------1.00.004
 //2011-04-01 ZswangY37 No.1 完善 快捷键加上alt避免文字输入时冲突
 //2011-04-01 ZswangY37 No.2 完善 只能启动一个实例
+//----------------------------------------------------------------------1.00.005
+//2011-04-02 ZswangY37 No.1 完善 可以选择是否抓取鼠标指针图案
+//2011-04-02 ZswangY37 No.2 完善 添加截屏功能
 //*******End 修改日志*******//
 
 unit ScreenPaintUnit;
@@ -69,8 +72,8 @@ type
     ActionClose: TAction;
     MenuItem6Pixel: TMenuItem;
     MenuItemBlog: TMenuItem;
-    N2: TMenuItem;
-    N3: TMenuItem;
+    MenuItemLineH: TMenuItem;
+    MenuItemLineG: TMenuItem;
     ActionStop: TAction;
     TimerPlay: TTimer;
     ActionPen: TAction;
@@ -118,6 +121,18 @@ type
     N15: TMenuItem;
     N16: TMenuItem;
     N17: TMenuItem;
+    ActionPhoto: TAction;
+    MenuItemPhotoB: TMenuItem;
+    ActiveCursor: TAction;
+    MenuItemCursorA: TMenuItem;
+    ActionLoadFromFile: TAction;
+    MenuItemFile: TMenuItem;
+    MenuItemSaveToFile: TMenuItem;
+    MenuItemLoadFromFIle: TMenuItem;
+    MenuItemLineD: TMenuItem;
+    MenuItemLineE: TMenuItem;
+    MenuItemFileShellB: TMenuItem;
+    MenuItemLineF: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure ActionPlayExecute(Sender: TObject);
@@ -153,6 +168,10 @@ type
     procedure ActionPasteExecute(Sender: TObject);
     procedure ActionUndoExecute(Sender: TObject);
     procedure ActionRedoExecute(Sender: TObject);
+    procedure ActionPhotoExecute(Sender: TObject);
+    procedure ActiveCursorExecute(Sender: TObject);
+    procedure ActionSaveToFileExecute(Sender: TObject);
+    procedure ActionLoadFromFileExecute(Sender: TObject);
   private
     { Private declarations }
     FLovelyPaint: TLovelyPaint21;
@@ -162,6 +181,7 @@ type
     FShapeType: Byte;
     FSelectModel: string;
     FRegistryShell: Boolean;
+    FFileName: string;
     procedure AddNotifyIcon; //添加托盘图标
     procedure WMICONEVENT(var Msg: TMessage); message WM_ICONEVENT;
     procedure WMSYSCOMMAND(var Msg: TWMSysCommand); message WM_SYSCOMMAND;
@@ -171,6 +191,7 @@ type
     function IsRegistryShell: Boolean;
     procedure RegistryShell;
     procedure UnregistryShell;
+    procedure OpenFile(AFileName: string);
   public
     { Public declarations }
     procedure ReloadScreen;
@@ -218,6 +239,8 @@ begin
   AddNotifyIcon;
   RegisterHotKey(Handle, cHotKeyWinP, MOD_WIN, VK_P);
   RegisterHotKey(Handle, cHotKeyWinZ, MOD_WIN, VK_Z);
+
+  if FileExists(ParamStr(1)) then OpenFile(ParamStr(1)) else Play;
 end;
 
 procedure TFormScreenPaint.ReloadScreen;
@@ -225,7 +248,7 @@ var
   vBitmap: TBitmap;
 begin
   vBitmap := TBitmap.Create;
-  TakeDesktop(vBitmap, Screen.DesktopRect);
+  TakeDesktop(vBitmap, Screen.DesktopRect, ActiveCursor.Checked);
 
   Top := 0;
   Left := 0;
@@ -242,11 +265,13 @@ begin
   FLovelyPaint.SetBackGraphic(vBitmap);
   FLovelyPaint.SelectShape := FShapeType;
   FLovelyPaint.SelectPenColor := FPenColor;
+  FLovelyPaint.SelectTextColor := FLovelyPaint.SelectPenColor;
   FLovelyPaint.SelectTools := FShapeTool;
   FLovelyPaint.SelectPenWidth := FPenWidth;
   FLovelyPaint.SelectModel := FSelectModel;
   FLovelyPaint.IsScreenPaint := True;
   FLovelyPaint.PopupMenu := PopupMenuPaint;
+  FLovelyPaint.SelectTextSize := 12;
   ActiveControl := FLovelyPaint;
   vBitmap.Free;
 end;
@@ -323,8 +348,10 @@ begin
 end;
 
 procedure TFormScreenPaint.MYPLAY(var Msg: TMessage);
+var vBuffer: array[0..MAX_PATH]of Char;
 begin
-  Play;
+  GlobalGetAtomName(Msg.WParam, vBuffer, SizeOf(vBuffer));
+  OpenFile(vBuffer);
 end;
 
 procedure TFormScreenPaint.ActionStopExecute(Sender: TObject);
@@ -404,6 +431,7 @@ procedure TFormScreenPaint.ActionBlackExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clBlack;
+  FLovelyPaint.SelectTextColor := FLovelyPaint.SelectPenColor;
   FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
@@ -411,6 +439,7 @@ procedure TFormScreenPaint.ActionRedExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clRed;
+  FLovelyPaint.SelectTextColor := FLovelyPaint.SelectPenColor;
   FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
@@ -418,6 +447,7 @@ procedure TFormScreenPaint.ActionGreenExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clGreen;
+  FLovelyPaint.SelectTextColor := FLovelyPaint.SelectPenColor;
   FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
@@ -425,6 +455,7 @@ procedure TFormScreenPaint.ActionSkyExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clSkyBlue;
+  FLovelyPaint.SelectTextColor := FLovelyPaint.SelectPenColor;
   FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
@@ -432,6 +463,7 @@ procedure TFormScreenPaint.ActionWhiteExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenColor := clWhite;
+  FLovelyPaint.SelectTextColor := FLovelyPaint.SelectPenColor;
   FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
@@ -441,6 +473,7 @@ begin
   ColorDialogOne.Color := FLovelyPaint.SelectPenColor;
   if not ColorDialogOne.Execute then Exit;
   FLovelyPaint.SelectPenColor := ColorDialogOne.Color;
+  FLovelyPaint.SelectTextColor := FLovelyPaint.SelectPenColor;
   FPenColor := FLovelyPaint.SelectPenColor;
 end;
 
@@ -552,6 +585,26 @@ begin
   ActionUndo.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANUNDO, 0, 0) <> 0);
   ActionRedo.Enabled := Assigned(FLovelyPaint) and (SendMessage(FLovelyPaint.Handle, LP_CANREDO, 0, 0) <> 0);
 
+  ActionPhoto.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectTools = pstPhoto);
+  ActionModify.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectTools = pstModify);
+
+  ActionBlack.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenColor = clBlack);
+  ActionRed.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenColor = clRed);
+  ActionGreen.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenColor = clGreen);
+  ActionSky.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenColor = clSkyBlue);
+  ActionWhite.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenColor = clWhite);
+  ActionMoreColor.Checked := not (ActionBlack.Checked or
+    ActionRed.Checked or
+    ActionGreen.Checked or
+    ActionSky.Checked or
+    ActionWhite.Checked
+  );
+
+  Action3Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 3);
+  Action4Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 4);
+  Action5Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 5);
+  Action6Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 6);
+
   if FRegistryShell then
   begin
     ActionFileShell.Caption := '取消关联';
@@ -603,6 +656,52 @@ procedure TFormScreenPaint.ActionRedoExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
   SendMessage(FLovelyPaint.Handle, LP_REDO, 0, 0);
+end;
+
+procedure TFormScreenPaint.ActionPhotoExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  FLovelyPaint.SelectTools := pstPhoto;
+end;
+
+procedure TFormScreenPaint.ActiveCursorExecute(Sender: TObject);
+begin
+  //
+end;
+
+procedure TFormScreenPaint.ActionSaveToFileExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  if FFileName <> '' then
+    SaveDialogOne.FileName := FFileName
+  else SaveDialogOne.FileName := '未命名';
+
+  if not SaveDialogOne.Execute then Exit;
+  if ExtractFileExt(SaveDialogOne.FileName) = '' then
+    case SaveDialogOne.FilterIndex of
+      0, 1: SaveDialogOne.FileName := ChangeFileExt(SaveDialogOne.FileName,
+        cFileExt);
+    end;
+  FFileName := SaveDialogOne.FileName;
+
+  FLovelyPaint.SaveToFile(FFileName);
+end;
+
+procedure TFormScreenPaint.ActionLoadFromFileExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  if not OpenDialogOne.Execute then Exit;
+  if not FileExists(OpenDialogOne.FileName) then Exit;
+  FLovelyPaint.LoadFromFile(OpenDialogOne.FileName);
+end;
+
+procedure TFormScreenPaint.OpenFile(AFileName: string);
+begin
+  FFileName := AFileName;
+  OpenDialogOne.FileName := FFileName;
+  if not Assigned(FLovelyPaint) then Play;
+  if not FileExists(OpenDialogOne.FileName) then Exit;
+  FLovelyPaint.LoadFromFile(OpenDialogOne.FileName);
 end;
 
 end.

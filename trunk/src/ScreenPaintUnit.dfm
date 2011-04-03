@@ -25,6 +25,7 @@ object FormScreenPaint: TFormScreenPaint
     Top = 8
     object MenuItemPlayA: TMenuItem
       Action = ActionPlay
+      Caption = #21551#29992' '#12304'Win+P'#25110'Win+Z'#12305
     end
     object MenuItemLineG: TMenuItem
       Caption = '-'
@@ -216,7 +217,6 @@ object FormScreenPaint: TFormScreenPaint
       Category = 'Edit'
       Caption = #20840#36873
       OnExecute = ActionSelectAllExecute
-      OnUpdate = Action3PixelExecute
     end
     object ActionClose: TAction
       Caption = #20851#38381
@@ -321,7 +321,6 @@ object FormScreenPaint: TFormScreenPaint
     object Action3Pixel: TAction
       Category = 'Pixel'
       Caption = '3'#20687#32032
-      Checked = True
       GroupIndex = 2
       ShortCut = 51
       OnExecute = Action3PixelExecute

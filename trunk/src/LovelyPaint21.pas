@@ -104,7 +104,7 @@
 //2011-04-03 ZswangY37 No.1 完善 能够保证图像列表和资源列表
 //2011-04-03 ZswangY37 No.2 完善 增加感应边缘，放大时停留在边缘自动滚动
 //2011-04-03 ZswangY37 No.3 修正 第一次粘贴两个资源型图形，撤销重复导致的异常，原因是通过资源id获取资源存在风险TResourceList.IndexFromIdent
-
+//2011-04-03 ZswangY37 No.4 完善 粘贴时优先图片格式
 {$R-}
 
 unit LovelyPaint21;
@@ -2440,7 +2440,7 @@ procedure TLovelyPaint21.LPCANPASTE(var Msg: TMessage);
 begin
   if FModifyShape is TCustomShapeText then
     Msg.Result := Ord(Clipboard.HasFormat(CF_TEXT))
-  else Msg.Result := Ord((SelectTools = pstModify) and
+  else Msg.Result := Ord((SelectTools in [pstModify, pstPaint]) and
     (Clipboard.HasFormat(CF_SHAPES) or
     Clipboard.HasFormat(CF_TEXT) or
     Clipboard.HasFormat(CF_BITMAP)));
@@ -3103,7 +3103,6 @@ begin
           FAnchorIndex := -1;
           FAnchorAngle := 0;
           FAnchorShape := nil;
-          Exit;
         end;
         if FHasSelectRect then
         begin
@@ -3123,7 +3122,6 @@ begin
             DrawPaint;
             PaintThis;
           end;
-          FHasSelectRect := False;
         end else
         begin
           if FMouseMoving and (FShapeList.SelectCount > 0) and
@@ -3176,6 +3174,7 @@ begin
         end;
       end;
   end;
+  FHasSelectRect := False;
 end;
 
 function TLovelyPaint21.PageHeight(mZoom: Double; mBorder: Boolean = False): Integer;
@@ -3311,6 +3310,23 @@ begin
   if vOrigin.Y < 0 then vOrigin.Y := 0;
   vOrigin := MouseToPoint(vOrigin);
 
+  { 粘贴图片 }
+  if Clipboard.HasFormat(CF_BITMAP) then                                        //2011-04-03 ZswangY37 No.4
+  begin
+    FShapeList.ClearSelect;
+    vBitmap := TBitmap.Create;
+    vBitmap.PixelFormat := pf24bit;
+    vJpegImage := TJpegImage.Create;
+    try
+      vBitmap.Assign(Clipboard);
+      BmpToJpeg(vBitmap, vJpegImage, 75);
+      Result := PasteImage(vOrigin, vJpegImage);
+    finally
+      vJpegImage.Free;
+      vBitmap.Free;
+    end;
+  end;
+
   { 粘贴文字 }
   if Clipboard.HasFormat(CF_TEXT) then
   begin
@@ -3333,23 +3349,6 @@ begin
     Result := True;
     Exit;
   end;
-  { 粘贴图片 }
-  if Clipboard.HasFormat(CF_BITMAP) then
-  begin
-    FShapeList.ClearSelect;
-    vBitmap := TBitmap.Create;
-    vBitmap.PixelFormat := pf24bit;
-    vJpegImage := TJpegImage.Create;
-    try
-      vBitmap.Assign(Clipboard);
-      BmpToJpeg(vBitmap, vJpegImage, 75);
-      Result := PasteImage(vOrigin, vJpegImage);
-    finally
-      vJpegImage.Free;
-      vBitmap.Free;
-    end;
-  end;
-
   if not Clipboard.HasFormat(CF_SHAPES) then Exit;
 
   vShapeStream := TMemoryStream.Create;
@@ -3607,7 +3606,7 @@ begin
       begin
         if Assigned(FOnCommand) then FOnCommand(Self, vCommand,
           cCommandInfoHeadSize + vCommand^.rParamSize);
-        FreeMem(vCommand, cCommandInfoHeadSize + vCommand.rParamSize);  //2007-12-20 ZswangY37 No.1
+        FreeMem(vCommand, cCommandInfoHeadSize + vCommand.rParamSize);          //2007-12-20 ZswangY37 No.1
         vCommand := FCommandList.NewResourceCommand(vResourceInfo, I);
       end;
     end;
@@ -3949,6 +3948,7 @@ procedure TLovelyPaint21.SetSelectTools(const Value: TShapeTools);
 begin
   if FSelectTools = Value then Exit;
   if Assigned(FModifyShape) then ShapeAccept; // 如果是从绘制状态改变
+  FHasSelectRect := False;
   case FSelectTools of
     pstLaser: // 如果是从光笔状态改变
       if FLaserActive then
@@ -4166,8 +4166,8 @@ begin
     Exit;
   end;
   vOrigin := Origin;
-  Inc(vOrigin.X, FScrollOrigin.X);
-  Inc(vOrigin.Y, FScrollOrigin.Y);
+  Inc(vOrigin.X, FScrollOrigin.X * 2);
+  Inc(vOrigin.Y, FScrollOrigin.Y * 2);
   Origin := vOrigin;
 end;
 

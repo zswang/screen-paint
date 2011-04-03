@@ -29,6 +29,7 @@
 //2007-11-19 ZswangY37 No.4 添加 TCustomShapeText.OldText属性，以便判断文本是否发生改变而提交
 //2007-11-25 ZswangY37 No.1 添加 资源方式处理大数据
 //2007-12-07 ZswangY37 No.1 修正 画笔计算区域没有偏移第一个点的位置
+//2011-04-03 ZswangY37 No.1 完善 取消资源id，统一使用crc32和size定位资源 
 
 {$R-}
 
@@ -76,7 +77,6 @@ type
   PShapeInfo = ^TShapeInfo;
 
   TResourceInfo = packed record
-    rIdent: Longword;
     rCrc32: Longword;
     rReceiveSize: Integer; // 接收的大小
     rSize: Integer;
@@ -149,7 +149,6 @@ const
 type
   TPointsData = packed record // 多点数据
     rOffset: TSmallPoint;
-    rResourceID: Longword; // 资源ID
     rResourceCrc32: Longword; // 资源校验码
     rResourceSize: Longword; // 资源大小
   end;
@@ -170,7 +169,6 @@ type
 
   TMemoData = packed record // 多行文本数据
     rPoint: TSmallPoint;
-    rResourceID: Longword; // 资源ID
     rResourceCrc32: Longword; // 资源校验码
     rResourceSize: Longword; // 资源大小
   end;
@@ -179,7 +177,6 @@ type
   TImageData = packed record // 图片数据
     rType: Byte; // 图片类型
     rRect: TRectData; // 区域
-    rResourceID: Longword; // 资源ID
     rResourceCrc32: Longword; // 资源校验码
     rResourceSize: Longword; // 资源大小
   end;
@@ -209,7 +206,6 @@ type
     FAngle: Byte;
     FCanReangle: Boolean; // 旋转角度
   protected
-    FResourceID: Longword; // 资源ID                                            //2007-11-25 ZswangY37 No.1
     FResourceCrc32: Longword; // 资源校验码
     FResourceSize: Longword; // 资源大小
     FHasResource: Boolean; // 是否使用资源
@@ -232,7 +228,6 @@ type
     property Visible: Boolean read FVisible write FVisible; // 是否可见
     property Translucency: Boolean read FTranslucency write FTranslucency; // 是否半透明
     property Angle: Byte read FAngle write FAngle; // 角度
-    property ResourceID: Longword read FResourceID write FResourceID; // 资源ID
     property ResourceCrc32: Longword read FResourceCrc32 write FResourceCrc32; // 资源校验码
     property ResourceSize: Longword read FResourceSize write FResourceSize; // 资源大小
     property HasResource: Boolean read FHasResource; // 是否使用资源
@@ -1002,7 +997,6 @@ begin
     GetMem(vResourceInfo, SizeOf(TResourceInfo) - SizeOf(Char) + vSize);
     try
       Move(vData^, vResourceInfo^.rData[0], vSize);
-      vResourceInfo^.rIdent := FResourceID;
       vResourceInfo^.rCrc32 := BufferCRC32(vResourceInfo^.rData[0], vSize);
       vResourceInfo^.rReceiveSize := vSize;
       vResourceInfo^.rSize := vSize;
@@ -1079,7 +1073,7 @@ begin
       FreeMem(vShapeInfo, SizeOf(TShapeInfo) - SizeOf(Char) + vSize);
     end;
   finally
-    FreeMem(vData, vSize);
+    if vSize <> 0 then FreeMem(vData, vSize);
   end;
 end;
 
@@ -1149,10 +1143,14 @@ function TCustomShapePoints.GetData(var AData: Pointer;
   var ASize: Integer): Boolean;
 begin
   Result := False;
-  if FPoints.Count <= 0 then Exit;
+  if FPoints.Count <= 0 then
+  begin
+    AData := nil;
+    ASize := 0;
+    Exit;
+  end;
   ASize := SizeOf(TPointsData);
   GetMem(AData, ASize);
-  PPointsData(AData)^.rResourceID := FResourceID;
   PPointsData(AData)^.rResourceCrc32 := FResourceCrc32;
   PPointsData(AData)^.rResourceSize := FResourceSize;
   PPointsData(AData)^.rOffset.x := FOffset.X;
@@ -1215,7 +1213,6 @@ begin
     Dispose(PPoint(FPoints[I]));
   FPoints.Clear;
   ///////End 清除历史
-  FResourceId := PPointsData(AData)^.rResourceID;
   FResourceCrc32 := PPointsData(AData)^.rResourceCrc32;
   FResourceSize := PPointsData(AData)^.rResourceSize;
   FOffset.X := PPointsData(AData)^.rOffset.x;
@@ -1988,7 +1985,12 @@ function TCustomShapeText.GetData(var AData: Pointer;
   var ASize: Integer): Boolean;
 begin
   Result := False;
-  if FText = '' then Exit;
+  if FText = '' then
+  begin
+    AData := nil;
+    ASize := 0;
+    Exit;
+  end;
   ASize := SizeOf(TTextData) - SizeOf(WideChar) +
     SizeOf(WideChar) * Length(FText);
   GetMem(AData, ASize);
@@ -2679,13 +2681,17 @@ function TShapeMemo.GetData(var AData: Pointer;
   var ASize: Integer): Boolean;
 begin
   Result := False;
-  if FText = '' then Exit;
+  if FText = '' then
+  begin
+    AData := nil;
+    ASize := 0;
+    Exit;
+  end;
 
   ASize := SizeOf(TMemoData);
   GetMem(AData, ASize);
   PMemoData(AData)^.rPoint.x := FPoint.X;
   PMemoData(AData)^.rPoint.y := FPoint.Y;
-  PMemoData(AData)^.rResourceID := FResourceID;
   PMemoData(AData)^.rResourceCrc32 := FResourceCrc32;
   PMemoData(AData)^.rResourceSize := FResourceSize;
   Result := True;
@@ -2867,7 +2873,6 @@ begin
   if PTextData(AData)^.rCount <= 0 then Exit;
   FPoint.X := PMemoData(AData)^.rPoint.x;
   FPoint.Y := PMemoData(AData)^.rPoint.y;
-  FResourceID := PMemoData(AData)^.rResourceID;
   FResourceCrc32 := PMemoData(AData)^.rResourceCrc32;
   FResourceSize := PMemoData(AData)^.rResourceSize;
   Result := True;
@@ -3893,7 +3898,6 @@ begin
   PImageData(AData)^.rRect.rFromPoint.Y := FFromPoint.Y;
   PImageData(AData)^.rRect.rToPoint.X := FToPoint.X;
   PImageData(AData)^.rRect.rToPoint.Y := FToPoint.Y;
-  PImageData(AData)^.rResourceID := FResourceID;
   PImageData(AData)^.rResourceCrc32 := FResourceCrc32;
   PImageData(AData)^.rResourceSize := FResourceSize;
   Result := True;
@@ -3943,7 +3947,6 @@ begin
   FFromPoint.Y := PImageData(AData)^.rRect.rFromPoint.Y;
   FToPoint.X := PImageData(AData)^.rRect.rToPoint.X;
   FToPoint.Y := PImageData(AData)^.rRect.rToPoint.Y;
-  FResourceID := PImageData(AData)^.rResourceID;
   FResourceCrc32 := PImageData(AData)^.rResourceCrc32;
   FResourceSize := PImageData(AData)^.rResourceSize;
   if Assigned(FGraphic) then

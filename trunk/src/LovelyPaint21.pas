@@ -100,6 +100,10 @@
 //2007-12-07 ZswangY37 No.2 完善 通知调用方滚动翻页或修改状态改变
 //2007-12-07 ZswangY37 No.3 完善 边缘滚动5次才翻页，避免误操作
 //2007-12-20 ZswangY37 No.1 修正 资源绘制，命名没有释放内存，导致内存泄露
+//2011-04-02 ZswangY37 No.1 完善 添加截屏功能
+//2011-04-03 ZswangY37 No.1 完善 能够保证图像列表和资源列表
+//2011-04-03 ZswangY37 No.2 完善 增加感应边缘，放大时停留在边缘自动滚动
+//2011-04-03 ZswangY37 No.3 修正 第一次粘贴两个资源型图形，撤销重复导致的异常，原因是通过资源id获取资源存在风险TResourceList.IndexFromIdent
 
 {$R-}
 
@@ -109,6 +113,13 @@ interface
 
 uses Windows, Messages, Classes, SysUtils, Graphics, Controls, Forms, Types,
   ExtCtrls, ShapeUtils21, CursorResource21, VectorSelectBoxUnit;
+
+type
+  TPaintFileHeader = packed record //luf文件头信息
+    rFlag: array[0..2] of Char; // 标识 // pat
+    rVersion: Byte; // 文件版本 // 1
+    rData: array[0..0] of Char; // 数据块(资源区+图形区)
+  end;
 
 ///////Begin 外部编辑消息
 const
@@ -201,7 +212,6 @@ type
   PAngleCommand = ^TAngleCommand;
 
   TResourceCommand = packed record // 扩展数据命令
-    rResourceIdent: Longword; // 数据标识
     rResourceSize: Integer; // 数据总大小
     rResourceCrc32: Longword; // CRC校正码
     rBlockPostion: Integer; // 起始位置
@@ -261,6 +271,33 @@ type
   end;
 
 type
+  TResourceList = class // 数据列表                                             //2007-11-25 ZswangY37 No.1
+  private
+    FResourceList: TList;
+    FControlIdent: Word; // 控制ID
+    FLastIdent: Word; // 当前ID生成的序号
+    function GetItems(AIndex: Integer): PResourceInfo;
+    function GetCount: Integer;
+  public
+    constructor Create;
+    destructor Destroy; override;
+
+    function SaveToStream(AStream: TStream): Boolean; // 保存到流中
+    function LoadFromStream(AStream: TStream): Boolean; // 从流中载入
+    //function IndexFromIdent(AIdent: Longword): Integer;                       //2011-04-03 ZswangY37 No.3
+    function IndexFromCrc32(ACrc32: Longword; ASize: Integer): Integer;
+    procedure Clear; // 清除全部数据
+    procedure Delete(AIndex: Integer); // 删除一个数据
+    function ReadStream(AStream: TStream; var AAppend: Boolean): Integer;
+    function AcceptCommand( // 接受一条命令
+      AResourceCommand: PResourceCommand // 数据命令
+    ): Boolean; // 返回处理是否成功
+    function NewResource(AData: Pointer; ASize: Integer): PResourceInfo;
+
+    property Items[AIndex: Integer]: PResourceInfo read GetItems; default; // 每一条数据
+    property Count: Integer read GetCount;
+  end;
+
   TShapeList = class // 图形列表
   private
     FShapes: TList;
@@ -277,7 +314,7 @@ type
   public
     function IndexFromIdent(AIdent: Longword): Integer;
     function SaveToStream(AStream: TStream): Boolean; // 保存到流中
-    function LoadFromStream(AStream: TStream): Boolean; // 从流中载入
+    function LoadFromStream(AStream: TStream; AResourceList: TResourceList): Boolean; // 从流中载入
     procedure SelectIdents(var AIdents: TIdents); // 获得选中的标识列表
     procedure ClearSelect; // 清除选择
     procedure DeleteSelect; // 删除选择项
@@ -308,31 +345,6 @@ type
 
     constructor Create;
     destructor Destroy; override;
-  end;
-
-  TResourceList = class // 数据列表                                             //2007-11-25 ZswangY37 No.1
-  private
-    FResourceList: TList;
-    FControlIdent: Word; // 控制ID
-    FLastIdent: Word; // 当前ID生成的序号
-    function GetItems(AIndex: Integer): PResourceInfo;
-  public
-    constructor Create;
-    destructor Destroy; override;
-
-    function SaveToStream(AStream: TStream): Boolean; // 保存到流中
-    function LoadFromStream(AStream: TStream): Boolean; // 从流中载入
-    function IndexFromIdent(AIdent: Longword): Integer;
-    function IndexFromCrc32(ACrc32: Longword; ASize: Integer): Integer;
-    procedure Clear; // 清除全部数据
-    procedure Delete(AIndex: Integer); // 删除一个数据
-    function ReadStream(AStream: TStream; var AAppend: Boolean): Integer;
-    function AcceptCommand( // 接受一条命令
-      AResourceCommand: PResourceCommand // 数据命令
-    ): Boolean; // 返回处理是否成功
-    function NewResource(AData: Pointer; ASize: Integer): PResourceInfo;
-
-    property Items[AIndex: Integer]: PResourceInfo read GetItems; default; // 每一条数据
   end;
 
   TCommandList = class // 图形列表
@@ -468,7 +480,8 @@ type
     FResourceList: TResourceList;
     FCanReangle: Boolean;
     FIsScreenPaint: Boolean;
-    FPhotoRect: TRect;
+    FPhotoRect: TRect; // 截屏区域
+    FScrollOrigin: TPoint; // 滚动的偏移
 
     procedure SetControlIdent(const Value: Word);
     procedure SetSelectTranslucency(const Value: Boolean);
@@ -946,40 +959,17 @@ begin
     end;
 end;
 
-function TShapeList.LoadFromStream(AStream: TStream): Boolean;
+function TShapeList.LoadFromStream(AStream: TStream; AResourceList: TResourceList): Boolean;
 var
   vShape: TCustomShape;
   vShapeInfo: TShapeInfo;
-begin
-  Result := False;
-  if not Assigned(AStream) then Exit;
-  Clear; // 清除全部图像
-  while AStream.Read(vShapeInfo, cShapeInfoHeadSize) > 0 do
-  begin
-    { TODO -c2006.12.01 -oZswangY37 : 判断DataSize是否合法 }
-    vShape := NewShape(vShapeInfo.rType);
-    if Assigned(vShape) then
-    begin
-      AStream.Seek(-cShapeInfoHeadSize, soFromCurrent);
-      vShape.StreamRead(AStream);
-      Append(vShape);
-    end else AStream.Seek(vShapeInfo.rDataSize, soFromCurrent);
-  end;
-  Result := True;
-end;
-
-(*function TShapeList.LoadFromStream(AStream: TStream): Boolean;
-var
-  vShape: TCustomShape;
-  vShapeInfo: TShapeInfo;
+  vResourceInfo: PResourceInfo;
   vCount: Integer;
   I: Integer;
 begin
   Result := False;
   if not Assigned(AStream) then Exit;
   AStream.Read(vCount, SizeOf(vCount));
-  OutputDebugString(PChar(Format('．～%d', [vCount])));
-  Clear; // 清除全部图像
   I := 0;
   while (I < vCount) and (AStream.Read(vShapeInfo, cShapeInfoHeadSize) > 0) do
   begin
@@ -989,12 +979,23 @@ begin
     begin
       AStream.Seek(-cShapeInfoHeadSize, soFromCurrent);
       vShape.StreamRead(AStream);
+      if vShape.HasResource and Assigned(AResourceList) then
+      begin
+        I := AResourceList.IndexFromCrc32(
+          vShape.ResourceCrc32, vShape.ResourceSize);
+        if I >= 0 then
+        begin
+          vResourceInfo := AResourceList[I];
+          vShape.SetResource(@vResourceInfo^.rData[0], vResourceInfo^.rSize);
+        end;
+      end;
+      vShape.UpdateRect;
       Append(vShape);
     end else AStream.Seek(vShapeInfo.rDataSize, soFromCurrent);
     Inc(I);
   end;
   Result := True;
-end;*)
+end;
 
 procedure TShapeList.Offset(AOffset: TPoint);
 var
@@ -1007,17 +1008,6 @@ end;
 function TShapeList.SaveToStream(AStream: TStream): Boolean;
 var
   I: Integer;
-begin
-  Result := False;
-  if not Assigned(AStream) then Exit;
-  for I := 0 to FShapes.Count - 1 do
-    TCustomShape(FShapes[I]).StreamWrite(AStream);
-  Result := True;
-end;
-
-(*function TShapeList.SaveToStream(AStream: TStream): Boolean;
-var
-  I: Integer;
   vCount: Integer;
 begin
   Result := False;
@@ -1027,7 +1017,7 @@ begin
   for I := 0 to FShapes.Count - 1 do
     TCustomShape(FShapes[I]).StreamWrite(AStream);
   Result := True;
-end;*)
+end;
 
 procedure TShapeList.SelectAngle(AAngle: Byte);
 var
@@ -1495,25 +1485,31 @@ procedure TLovelyPaint21.CopyToClipboard;
 var
   I: Integer;
   vShapeStream: TMemoryStream;
+  vShape: TCustomShape;
   vResourceStream: TMemoryStream;
   vData: THandle;
   vGlobal: Pointer;
-  vResourceList: TList;
+  vResourceList: TStringList;
+  vResourceKey: string;
 begin
   if FShapeList.SelectCount <= 0 then Exit;
   vShapeStream := TMemoryStream.Create;
   vResourceStream := TMemoryStream.Create;                                      //2007-11-26 ZswangY37 No.1
   try
-    vResourceList := TList.Create;
+    vResourceList := TStringList.Create;
     try
-    for I := 0 to FShapeList.Count - 1 do
-      if FShapeList[I].Selected then // 选中
+      for I := 0 to FShapeList.Count - 1 do
       begin
-        if FShapeList[I].HasResource and
-          (vResourceList.IndexOf(Pointer(FShapeList[I].ResourceID)) < 0) then //没有添加过
+        vShape := FShapeList[I];
+        if vShape.Selected then // 选中
         begin
-          FShapeList[I].ResourceWrite(vResourceStream);
-          vResourceList.Add(Pointer(FShapeList[I].ResourceID))
+          vResourceKey := Format('%d,%d', [vShape.ResourceCrc32, vShape.ResourceSize]);
+          if vShape.HasResource and
+            (vResourceList.IndexOf(vResourceKey) < 0) then //没有添加过
+          begin
+            vShape.ResourceWrite(vResourceStream);
+            vResourceList.Add(vResourceKey);
+          end;
         end;
       end;
     finally
@@ -1568,7 +1564,7 @@ begin
 
   FTimerScroll := TTimer.Create(nil);
   FTimerScroll.Enabled := False;
-  FTimerScroll.Interval := 200;
+  FTimerScroll.Interval := 50;
   FTimerScroll.OnTimer := TimerScrollTimer;
 
   FZoomBitmap := TBitmap.Create;
@@ -2349,6 +2345,7 @@ function TLovelyPaint21.LoadFromFile(AFileName: TFileName): Boolean;
 var
   vFileStream: TFileStream;
   vFileHandle: THandle;
+  vPaintFileHeader: TPaintFileHeader;
 begin
   Result := False;
   if not FileExists(AFileName) then Exit;
@@ -2356,6 +2353,10 @@ begin
   if Integer(vFileHandle) <= 0 then Exit;
   vFileStream := TFileStream.Create(vFileHandle);
   try
+    vFileStream.Read(vPaintFileHeader,
+      SizeOf(TPaintFileHeader) - SizeOf(Char));
+    if (vPaintFileHeader.rFlag <> 'pat') and
+      (vPaintFileHeader.rVersion <> 1) then Exit; // 文件版本和类型不正确
     Result := LoadFromStream(vFileStream);
   finally
     vFileStream.Free;
@@ -2363,8 +2364,49 @@ begin
 end;
 
 function TLovelyPaint21.LoadFromStream(AStream: TStream): Boolean;
+var
+  vCommand: PCommandInfo;
+  vResourceStart: Integer;
+  vShapeStart: Integer;
+  vResourceInfo: PResourceInfo;
+  vShapeStream: TMemoryStream;
+  I: Integer;
+  vBlockPostion: Integer;
 begin
-  Result := FShapeList.LoadFromStream(AStream); // and FResourceList.LoadFromStream(AStream);
+  vResourceStart := FResourceList.Count;
+  vShapeStart := FShapeList.Count;
+  Result := FResourceList.LoadFromStream(AStream) and
+    FShapeList.LoadFromStream(AStream, FResourceList);                          //2011-04-03 ZswangY37 No.1
+  if not Result then Exit;
+  // 添加资源的命令
+  for I := vResourceStart to FResourceList.Count - 1 do
+  begin
+    vResourceInfo := FResourceList[I];
+    vBlockPostion := 0;
+    vCommand := FCommandList.NewResourceCommand(vResourceInfo, vBlockPostion);
+    while Assigned(vCommand) do
+    begin
+      if Assigned(FOnCommand) then FOnCommand(Self, vCommand,
+        cCommandInfoHeadSize + vCommand^.rParamSize);
+      FreeMem(vCommand, cCommandInfoHeadSize + vCommand.rParamSize);  //2007-12-20 ZswangY37 No.1
+      vCommand := FCommandList.NewResourceCommand(vResourceInfo, vBlockPostion);
+    end;
+  end;
+  // 添加图形的命令
+  vShapeStream := TMemoryStream.Create;
+  try
+    for I := vShapeStart to FShapeList.Count - 1 do
+    begin
+      FShapeList[I].StreamWrite(vShapeStream);
+    end;
+    vShapeStream.Position := 0;
+    vCommand := FCommandList.NewPasteCommand(vShapeStream);
+    FCommandRedo.Clear;
+    if Assigned(FOnCommand) then FOnCommand(Self, vCommand,
+      cCommandInfoHeadSize + vCommand^.rParamSize);
+  finally
+    vShapeStream.Free;
+  end;
   DrawShape;
   DrawCurrent;
   DrawPaint;
@@ -2772,13 +2814,13 @@ begin
 end;
 
 procedure TLovelyPaint21.MouseMove(Shift: TShiftState; X, Y: Integer);
+const cBoardSpace = 20; // 边缘滚动感应区
 var
   vShapeModify: TShapeModify;
   vHotShape: TCustomShape;
   vPoint: TPoint;
   vAnchorIndex: Integer;
   vAnchorShape: TCustomShape;
-  vOrigin: TPoint;
 begin
   inherited;
   if SelectTools = pstFollow then Exit; // 如果在跟随状态
@@ -2796,16 +2838,16 @@ begin
 //{$ENDIF}
   if IsScreenPaint and (Zoom > 1) then
   begin
-    vOrigin := Origin;
-    if X <= 5 then
-      vOrigin.X := vOrigin.X - 5
-    else if X >= ClientWidth - 5 then
-      vOrigin.X := vOrigin.X + 5;
-    if Y <= 5 then
-      vOrigin.Y := vOrigin.Y - 5
-    else if Y >= ClientHeight - 5 then
-      vOrigin.Y := vOrigin.Y + 5;
-    Origin := vOrigin;
+    FScrollOrigin := Point(0, 0);
+    if X <= cBoardSpace then
+      FScrollOrigin.X := -(cBoardSpace - X)
+    else if X >= ClientWidth - cBoardSpace then
+      FScrollOrigin.X := +(cBoardSpace - (ClientWidth - X));
+    if Y <= cBoardSpace then
+      FScrollOrigin.Y := -(cBoardSpace - Y)
+    else if Y >= ClientHeight - cBoardSpace then
+      FScrollOrigin.Y := +(cBoardSpace - (ClientHeight - Y));
+    FTimerScroll.Enabled := (FScrollOrigin.X <> 0) or (FScrollOrigin.Y <> 0); 
   end;
 
   if PtInRect(FBackBitmap.Canvas.ClipRect, vPoint) then
@@ -2845,6 +2887,7 @@ begin
           if not (ssLeft in Shift) then Exit;
           FPhotoRect.TopLeft := FDownPoint;
           FPhotoRect.BottomRight := vPoint;
+          FPhotoRect := ReviseRect(FPhotoRect);
           PaintThis;
         end;
       end;
@@ -3120,6 +3163,7 @@ begin
       end;
     pstPhoto:
       begin
+        PaintThis;
         if not IsRectEmpty(FPhotoRect) then // 非空
         begin
           vBitmap := TBitmap.Create;
@@ -3130,7 +3174,6 @@ begin
             vBitmap.Free;
           end;
         end;
-        PaintThis;
       end;
   end;
 end;
@@ -3174,6 +3217,7 @@ end;
 procedure TLovelyPaint21.PaintThis;
 var
   vRect: TRect;
+  T: Integer;
 begin
   if FUpdateing then Exit;
   if not HandleAllocated then Exit;                                             //2006-12-29 ZswangY37 No.1
@@ -3226,10 +3270,17 @@ begin
 
   if (FSelectTools = pstPhoto) and FMouseDown then
   begin
-    Canvas.Pen.Style := psDot;
+    Canvas.Pen.Style := psDash;
     vRect.TopLeft := PointToMouse(FPhotoRect.TopLeft);
     vRect.BottomRight := PointToMouse(FPhotoRect.BottomRight);
     Canvas.Rectangle(vRect);
+    Canvas.Font := Screen.MenuFont;
+    if vRect.Top > 20 then
+      T := vRect.Top - 20
+    else T := Min(ClientHeight - 20, vRect.Top + (vRect.Bottom - vRect.Top) + 2);
+    Canvas.Brush.Color := $00AAFFFF;
+    Canvas.TextOut(vRect.Left, T, Format('截图到剪贴板(%dx%d)',
+      [vRect.Right - vRect.Left, vRect.Bottom - vRect.Top]));
   end;
 end;
 
@@ -3265,6 +3316,7 @@ begin
   begin
     S := Trim(Clipboard.AsText);
     if S = '' then Exit;
+    FShapeList.ClearSelect;
 
     vShape := NewShape(stMemo);
     vShape.Translucency := SelectTranslucency;
@@ -3284,6 +3336,7 @@ begin
   { 粘贴图片 }
   if Clipboard.HasFormat(CF_BITMAP) then
   begin
+    FShapeList.ClearSelect;
     vBitmap := TBitmap.Create;
     vBitmap.PixelFormat := pf24bit;
     vJpegImage := TJpegImage.Create;
@@ -3367,7 +3420,6 @@ begin
               if I >= 0 then
               begin
                 vResourceInfo := FResourceList[I];
-                vShape.ResourceID := FResourceList[I]^.rIdent;
                 vShape.SetResource(@vResourceInfo^.rData[0], vResourceInfo^.rSize);
               end;
             end;
@@ -3542,13 +3594,11 @@ begin
     I := FResourceList.IndexFromCrc32(vCrc32, vSize);
     if I >= 0 then
     begin
-      FModifyShape.ResourceID := FResourceList[I]^.rIdent;
       FModifyShape.ResourceCrc32 := FResourceList[I]^.rCrc32;
       FModifyShape.ResourceSize := FResourceList[I]^.rSize;
     end else
     begin
       vResourceInfo := FResourceList.NewResource(vResource, vSize);
-      FModifyShape.ResourceID := vResourceInfo^.rIdent;
       FModifyShape.ResourceCrc32 := vResourceInfo^.rCrc32;
       FModifyShape.ResourceSize := vResourceInfo^.rSize;
       I := 0;
@@ -3569,9 +3619,13 @@ end;
 function TLovelyPaint21.SaveToFile(AFileName: TFileName): Boolean;
 var
   vFileStream: TFileStream;
+  vPaintFileHeader: TPaintFileHeader;
 begin
   vFileStream := TFileStream.Create(AFileName, fmCreate);
   try
+    vPaintFileHeader.rFlag := 'pat';
+    vPaintFileHeader.rVersion := 1;
+    vFileStream.Write(vPaintFileHeader, SizeOf(vPaintFileHeader) - SizeOf(Char));
     Result := SaveToStream(vFileStream);
   finally
     vFileStream.Free;
@@ -3580,7 +3634,7 @@ end;
 
 function TLovelyPaint21.SaveToStream(AStream: TStream): Boolean;
 begin
-  Result := FShapeList.SaveToStream(AStream); // and FResourceList.SaveToStream(AStream);
+  Result := FResourceList.SaveToStream(AStream) and FShapeList.SaveToStream(AStream);
 end;
 
 procedure TLovelyPaint21.SelectAll;
@@ -3908,7 +3962,7 @@ begin
   end;
   FSelectTools := Value;
   FShapeList.HighlightShape := nil;
-  if FShapeList.SelectCount > 0 then
+  if (FSelectTools <> pstModify) and (FShapeList.SelectCount > 0) then // 变化到编辑模式时不清空选择项
   begin
     FShapeList.ClearSelect;
     DrawShape;
@@ -4102,9 +4156,19 @@ begin
   end;
 end;
 
-procedure TLovelyPaint21.TimerScrollTimer(Sender: TObject);
+procedure TLovelyPaint21.TimerScrollTimer(Sender: TObject);                     //2011-04-03 ZswangY37 No.2
+var
+  vOrigin: TPoint;
 begin
-  //
+  if WindowFromPoint(Mouse.CursorPos) <> Handle then  // 鼠标停留在其他窗体上
+  begin
+    TTimer(Sender).Enabled := False;
+    Exit;
+  end;
+  vOrigin := Origin;
+  Inc(vOrigin.X, FScrollOrigin.X);
+  Inc(vOrigin.Y, FScrollOrigin.Y);
+  Origin := vOrigin;
 end;
 
 function TLovelyPaint21.Undo: Boolean;
@@ -4591,7 +4655,6 @@ begin
         if I >= 0 then
         begin
           vResourceInfo := AResourceList[I];
-          vShape.ResourceID := AResourceList[I]^.rIdent;
           vShape.SetResource(@vResourceInfo^.rData[0], vResourceInfo^.rSize);
         end;
       end;
@@ -4686,7 +4749,7 @@ begin
       end;
       if vShape.HasResource and Assigned(AResourceList) then
       begin
-        I := AResourceList.IndexFromIdent(vShape.ResourceID);
+        I := AResourceList.IndexFromCrc32(vShape.ResourceCrc32, vShape.ResourceSize);
         if I >= 0 then
         begin
           vResourceInfo := AResourceList[I];
@@ -4726,7 +4789,7 @@ begin
         AShapeList.FShapes.Add(vShape);
         if vShape.HasResource and Assigned(AResourceList) then
         begin
-          I := AResourceList.IndexFromIdent(vShape.ResourceID);
+          I := AResourceList.IndexFromCrc32(vShape.ResourceCrc32, vShape.ResourceSize);
           if I >= 0 then
           begin
             vResourceInfo := AResourceList[I];
@@ -5100,7 +5163,6 @@ begin
   PCommandInfo(Result)^.rParamSize := vParamSize;
   with PResourceCommand(@PCommandInfo(Result)^.rParam[0])^ do
   begin
-    rResourceIdent := AResourceInfo^.rIdent;
     rResourceSize := AResourceInfo^.rSize;
     rResourceCrc32 := AResourceInfo^.rCrc32;
     rBlockPostion := ABlockPostion;
@@ -5261,11 +5323,10 @@ var
 begin
   Result := False;
   if not Assigned(AResourceCommand) then Exit;
-  I := IndexFromIdent(AResourceCommand^.rResourceIdent);
+  I := IndexFromCrc32(AResourceCommand^.rResourceCrc32, AResourceCommand^.rResourceSize);
   if I < 0 then
   begin
     GetMem(vResourceInfo, cResourceInfoHeadSize + AResourceCommand.rResourceSize);
-    vResourceInfo^.rIdent := AResourceCommand^.rResourceIdent;
     vResourceInfo^.rReceiveSize := 0;
     vResourceInfo^.rCrc32 := AResourceCommand^.rResourceCrc32;
     vResourceInfo^.rSize := AResourceCommand^.rResourceSize;
@@ -5309,6 +5370,11 @@ begin
   inherited;
 end;
 
+function TResourceList.GetCount: Integer;
+begin
+  Result := FResourceList.Count;
+end;
+
 function TResourceList.GetItems(AIndex: Integer): PResourceInfo;
 begin
   Result := nil;
@@ -5334,6 +5400,7 @@ begin
   Result := -1;
 end;
 
+{
 function TResourceList.IndexFromIdent(AIdent: Longword): Integer;
 var
   I: Integer;
@@ -5350,6 +5417,7 @@ begin
   end;
   Result := -1;
 end;
+}
 
 function TResourceList.LoadFromStream(AStream: TStream): Boolean;
 var
@@ -5371,7 +5439,6 @@ function TResourceList.NewResource(
 begin
   GetMem(Result, cResourceInfoHeadSize + ASize);
   Inc(FLastIdent);
-  Result^.rIdent := MakeLong(FLastIdent, FControlIdent);
   Result^.rCrc32 := BufferCRC32(AData^, ASize);;
   Result^.rReceiveSize := ASize;
   Result^.rSize := ASize;
@@ -5398,7 +5465,6 @@ begin
     GetMem(vData, vSize);
     AStream.Seek(-cResourceInfoHeadSize, soFromCurrent);
     AStream.Read(vData^, vSize);
-    PResourceInfo(vData)^.rIdent := MakeLong(FLastIdent, FControlIdent); // 重新分配ID
     I := FResourceList.Add(vData);
     AAppend := True;
   end else AStream.Seek(vResourceInfo.rSize, soFromCurrent);
@@ -5421,6 +5487,7 @@ begin
     AStream.Write(vResourceInfo^,
       SizeOf(TResourceInfo) - SizeOf(Char) + vResourceInfo.rSize);
   end;
+  Result := True;
 end;
 
 initialization

@@ -18,6 +18,9 @@
 //----------------------------------------------------------------------1.00.005
 //2011-04-02 ZswangY37 No.1 完善 可以选择是否抓取鼠标指针图案
 //2011-04-02 ZswangY37 No.2 完善 添加截屏功能
+//2011-04-02 ZswangY37 No.3 完善 监听任务栏崩溃重建的消息
+//2011-04-03 ZswangY37 No.1 完善 开启文件保存和加载的功能
+//2011-04-03 ZswangY37 No.2 完善 加快鼠标停留在边缘的滚动
 //*******End 修改日志*******//
 
 unit ScreenPaintUnit;
@@ -26,21 +29,22 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, Menus, ExtCtrls, LovelyPaint21, ActnList, StdActns, AppEvnts;
+  Dialogs, Menus, ExtCtrls, LovelyPaint21, ActnList, StdActns, AppEvnts,
+  StdCtrls;
 
 const
   WM_ICONEVENT = WM_USER + 10; //托盘图标消息
   MY_PLAY = WM_USER + $5001; //启动
 
+var
+  WM_TASKBARCREATED: DWORD; //任务拦重建消息
+  
 const cIconIdent = 4587;
 const cHotKeyWinP = 1007;
 const cHotKeyWinZ = 1008;
 
 const
   cFileExt = '.paint';
-
-var
-  WM_TASKBARCREATED: DWORD; //任务拦重建消息
 
 type
   TFormScreenPaint = class(TForm)
@@ -55,13 +59,13 @@ type
     MenuItemLine: TMenuItem;
     MenuItemArrow: TMenuItem;
     MenuItemRectangle: TMenuItem;
-    MenuItem: TMenuItem;
+    MenuItemElipse: TMenuItem;
     MenuItemMoreShape: TMenuItem;
-    N9: TMenuItem;
-    N10: TMenuItem;
-    N13: TMenuItem;
-    N14: TMenuItem;
-    N12: TMenuItem;
+    MenuItemBlack: TMenuItem;
+    MenuItemRed: TMenuItem;
+    MenuItemWhite: TMenuItem;
+    MenuItemGreen: TMenuItem;
+    MenuItemMoreColor: TMenuItem;
     MenuItem3Pixel: TMenuItem;
     MenuItem4Pixel: TMenuItem;
     MenuItem5Pixel: TMenuItem;
@@ -82,7 +86,7 @@ type
     ActionArrow: TAction;
     ActionText: TAction;
     ActionMoreShape: TAction;
-    N5: TMenuItem;
+    MenuItemLineK: TMenuItem;
     MenuItemCloseB: TMenuItem;
     ActionEllipse: TAction;
     ActionBlack: TAction;
@@ -112,15 +116,15 @@ type
     ActionCut: TAction;
     ActionDelete: TAction;
     ActionSelectAll: TAction;
-    N1: TMenuItem;
-    N4: TMenuItem;
-    N6: TMenuItem;
-    N7: TMenuItem;
+    MenuItemCopyB: TMenuItem;
+    MenuItemPaste: TMenuItem;
+    MenuItemCut: TMenuItem;
+    MenuItemDelete: TMenuItem;
     MenuItemSelectAll: TMenuItem;
-    N11: TMenuItem;
-    N15: TMenuItem;
-    N16: TMenuItem;
-    N17: TMenuItem;
+    MenuItemUndoB: TMenuItem;
+    MenuItemRedo: TMenuItem;
+    MenuItemLineI: TMenuItem;
+    MenuItemLineJ: TMenuItem;
     ActionPhoto: TAction;
     MenuItemPhotoB: TMenuItem;
     ActiveCursor: TAction;
@@ -133,6 +137,8 @@ type
     MenuItemLineE: TMenuItem;
     MenuItemFileShellB: TMenuItem;
     MenuItemLineF: TMenuItem;
+    Action10Pixel: TAction;
+    MenuItem10Pixel: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure ActionPlayExecute(Sender: TObject);
@@ -172,6 +178,9 @@ type
     procedure ActiveCursorExecute(Sender: TObject);
     procedure ActionSaveToFileExecute(Sender: TObject);
     procedure ActionLoadFromFileExecute(Sender: TObject);
+    procedure Action10PixelExecute(Sender: TObject);
+  protected
+    procedure WndProc(var Message: TMessage); override;
   private
     { Private declarations }
     FLovelyPaint: TLovelyPaint21;
@@ -269,6 +278,7 @@ begin
   FLovelyPaint.SelectTools := FShapeTool;
   FLovelyPaint.SelectPenWidth := FPenWidth;
   FLovelyPaint.SelectModel := FSelectModel;
+  FLovelyPaint.SelectTranslucency := True;
   FLovelyPaint.IsScreenPaint := True;
   FLovelyPaint.PopupMenu := PopupMenuPaint;
   FLovelyPaint.SelectTextSize := 12;
@@ -604,6 +614,7 @@ begin
   Action4Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 4);
   Action5Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 5);
   Action6Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 6);
+  Action10Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 10);
 
   if FRegistryShell then
   begin
@@ -684,6 +695,10 @@ begin
     end;
   FFileName := SaveDialogOne.FileName;
 
+  if FileExists(SaveDialogOne.FileName) and
+    (MessageDlg(Format('文件"%s"已经存在，是否覆盖？',
+    [SaveDialogOne.FileName]), mtWarning, [mbYes, mbNo], 0) <> mrYes) then Exit;
+    
   FLovelyPaint.SaveToFile(FFileName);
 end;
 
@@ -703,5 +718,25 @@ begin
   if not FileExists(OpenDialogOne.FileName) then Exit;
   FLovelyPaint.LoadFromFile(OpenDialogOne.FileName);
 end;
+
+procedure TFormScreenPaint.WndProc(var Message: TMessage);
+begin
+  if Message.Msg = WM_TASKBARCREATED then begin
+    AddNotifyIcon;
+  end;
+  inherited;
+end;
+
+procedure TFormScreenPaint.Action10PixelExecute(Sender: TObject);
+begin
+  if not Assigned(FLovelyPaint) then Exit;
+  FLovelyPaint.SelectPenWidth := 10;
+  FPenWidth := FLovelyPaint.SelectPenWidth;
+end;
+
+initialization
+  WM_TASKBARCREATED := RegisterWindowMessage('TaskbarCreated');
+
+finalization
 
 end.

@@ -216,7 +216,7 @@ implementation
 {$R *.dfm}
 
 uses CommonFunctions51, GraphicFunctions51, ShapeUtils21, ShellAPI,
-  Registry, ShlObj;
+  Registry, ShlObj, IniFiles;
 
 procedure TFormScreenPaint.AddNotifyIcon;
 var
@@ -240,10 +240,23 @@ begin
   Application.HelpFile := ChangeFileExt(ParamStr(0), '.hlp');
   Caption := Application.Title;
 
-  FPenWidth := 3;
-  FPenColor := clBlack;
+  with TIniFile.Create(ChangeFileExt(ParamStr(0), '.ini')) do try
+    Font.Name := ReadString(Self.ClassName, 'Font.Name', Font.Name);
+    Font.Size := ReadInteger(Self.ClassName, 'Font.Size', Font.Size);
+    try
+      Font.Color := StringToColor(ReadString(Self.ClassName, 'Font.Color',
+        ColorToString(Font.Color)));
+    except
+    end;
+
+    FPenWidth := ReadInteger(Self.ClassName, 'PenWidth', 3);
+    FPenColor := ReadInteger(Self.ClassName, 'PenColor', clBlack);
+    FShapeType := ReadInteger(Self.ClassName, 'ShapeType', stPen);
+    FSelectModel := ReadString(Self.ClassName, 'SelectModel', '');
+  finally
+    Free;
+  end;
   FShapeTool := pstPaint;
-  FShapeType := stPen;
   Stop;
   AddNotifyIcon;
   RegisterHotKey(Handle, cHotKeyWinP, MOD_WIN, VK_P);
@@ -313,6 +326,15 @@ procedure TFormScreenPaint.FormDestroy(Sender: TObject);
 var
   vNotifyIconData: TNotifyIconData;
 begin
+  with TIniFile.Create(ChangeFileExt(ParamStr(0), '.ini')) do try
+    WriteInteger(Self.ClassName, 'PenWidth', FPenWidth);
+    WriteInteger(Self.ClassName, 'PenColor', FPenColor);
+    WriteInteger(Self.ClassName, 'ShapeType', FShapeType);
+    WriteString(Self.ClassName, 'SelectModel', FSelectModel);
+  finally
+    Free;
+  end;
+
   vNotifyIconData.cbSize := SizeOf(vNotifyIconData);
   vNotifyIconData.Wnd := Handle;
   vNotifyIconData.uID := cIconIdent;

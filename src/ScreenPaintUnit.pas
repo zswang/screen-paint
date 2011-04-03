@@ -294,6 +294,7 @@ begin
   FLovelyPaint.SelectPenWidth := FPenWidth;
   FLovelyPaint.SelectModel := FSelectModel;
   FLovelyPaint.SelectTranslucency := FShapeTranslucency;
+  FLovelyPaint.BorderWidth := 0;
   FLovelyPaint.IsScreenPaint := True;
   FLovelyPaint.PopupMenu := PopupMenuPaint;
   FLovelyPaint.SelectTextSize := 12;
@@ -514,6 +515,7 @@ end;
 procedure TFormScreenPaint.Action3PixelExecute(Sender: TObject);
 begin
   if not Assigned(FLovelyPaint) then Exit;
+  OutputDebugString(PChar(Format('Action3PixelExecute гобл%d', [GetTickCount])));
   FLovelyPaint.SelectPenWidth := 3;
   FPenWidth := FLovelyPaint.SelectPenWidth;
 end;

@@ -66,7 +66,7 @@ AutoIncBuild=1
 MajorVer=1
 MinorVer=0
 Release=0
-Build=18
+Build=20
 Debug=0
 PreRelease=0
 Special=0
@@ -77,7 +77,7 @@ CodePage=936
 [Version Info Keys]
 CompanyName=伴水工作室
 FileDescription=jihu.wang@gmail.com
-FileVersion=1.0.0.18
+FileVersion=1.0.0.20
 InternalName=伴水之剑-屏幕剑
 LegalCopyright=伴水工作室
 LegalTrademarks=Zswang.ScreenPaint

@@ -188,6 +188,7 @@ type
     FPenColor: TColor;
     FShapeTool: TShapeTools;
     FShapeType: Byte;
+    FShapeTranslucency: Boolean; // ÊÇ·ñÍ¸Ã÷
     FSelectModel: string;
     FRegistryShell: Boolean;
     FFileName: string;
@@ -253,6 +254,7 @@ begin
     FPenColor := ReadInteger(Self.ClassName, 'PenColor', clBlack);
     FShapeType := ReadInteger(Self.ClassName, 'ShapeType', stPen);
     FSelectModel := ReadString(Self.ClassName, 'SelectModel', '');
+    FShapeTranslucency := ReadBool(Self.ClassName, 'ShapeTranslucency', False);
   finally
     Free;
   end;
@@ -261,7 +263,7 @@ begin
   AddNotifyIcon;
   RegisterHotKey(Handle, cHotKeyWinP, MOD_WIN, VK_P);
   RegisterHotKey(Handle, cHotKeyWinZ, MOD_WIN, VK_Z);
-
+  FRegistryShell := IsRegistryShell;
   if FileExists(ParamStr(1)) then OpenFile(ParamStr(1)) else Play;
 end;
 
@@ -291,7 +293,7 @@ begin
   FLovelyPaint.SelectTools := FShapeTool;
   FLovelyPaint.SelectPenWidth := FPenWidth;
   FLovelyPaint.SelectModel := FSelectModel;
-  FLovelyPaint.SelectTranslucency := True;
+  FLovelyPaint.SelectTranslucency := FShapeTranslucency;
   FLovelyPaint.IsScreenPaint := True;
   FLovelyPaint.PopupMenu := PopupMenuPaint;
   FLovelyPaint.SelectTextSize := 12;
@@ -637,6 +639,14 @@ begin
   Action5Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 5);
   Action6Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 6);
   Action10Pixel.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectPenWidth = 10);
+
+  ActionPen.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectShape = stPen);
+  ActionLine.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectShape = stLine);
+  ActionRectangle.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectShape = stHollowRectangle);
+  ActionArrow.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectShape = stSingleArrow);
+  ActionText.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectShape = stMemo);
+  ActionMoreShape.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectShape = stVector);
+  ActionEllipse.Checked := Assigned(FLovelyPaint) and (FLovelyPaint.SelectShape = stHollowEllipse);
 
   if FRegistryShell then
   begin

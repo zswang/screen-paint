@@ -66,7 +66,7 @@ AutoIncBuild=1
 MajorVer=1
 MinorVer=0
 Release=0
-Build=14
+Build=18
 Debug=0
 PreRelease=0
 Special=0
@@ -77,13 +77,13 @@ CodePage=936
 [Version Info Keys]
 CompanyName=伴水工作室
 FileDescription=jihu.wang@gmail.com
-FileVersion=1.0.0.14
+FileVersion=1.0.0.18
 InternalName=伴水之剑-屏幕剑
 LegalCopyright=伴水工作室
 LegalTrademarks=Zswang.ScreenPaint
 OriginalFilename=ScreenPaint<SP>
 ProductName=屏幕画板
-ProductVersion=1.00.002
+ProductVersion=1.00.005
 Comments=http://t.sina.com.cn/zswang
 [Excluded Packages]
 d:\program files\borland\delphi6\Bin\dclnet60.bpl=Borland Internet Components

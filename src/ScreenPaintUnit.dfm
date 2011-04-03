@@ -65,7 +65,7 @@ object FormScreenPaint: TFormScreenPaint
       object MenuItemText: TMenuItem
         Action = ActionText
       end
-      object MenuItem: TMenuItem
+      object MenuItemElipse: TMenuItem
         Action = ActionEllipse
       end
       object MenuItemMoreShape: TMenuItem
@@ -74,22 +74,22 @@ object FormScreenPaint: TFormScreenPaint
     end
     object MenuItemColor: TMenuItem
       Caption = #39068#33394
-      object N9: TMenuItem
+      object MenuItemBlack: TMenuItem
         Action = ActionBlack
       end
-      object N10: TMenuItem
+      object MenuItemRed: TMenuItem
         Action = ActionRed
       end
-      object N14: TMenuItem
+      object MenuItemGreen: TMenuItem
         Action = ActionGreen
       end
-      object N13: TMenuItem
+      object MenuItemWhite: TMenuItem
         Action = ActionWhite
       end
       object MenuItemSky: TMenuItem
         Action = ActionSky
       end
-      object N12: TMenuItem
+      object MenuItemMoreColor: TMenuItem
         Action = ActionMoreColor
       end
     end
@@ -107,34 +107,37 @@ object FormScreenPaint: TFormScreenPaint
       object MenuItem6Pixel: TMenuItem
         Action = Action6Pixel
       end
+      object MenuItem10Pixel: TMenuItem
+        Action = Action10Pixel
+      end
     end
     object MenuItemEdit: TMenuItem
       Caption = #32534#36753
-      object N1: TMenuItem
+      object MenuItemCopyB: TMenuItem
         Action = ActionCopy
       end
-      object N4: TMenuItem
+      object MenuItemPaste: TMenuItem
         Action = ActionPaste
       end
-      object N6: TMenuItem
+      object MenuItemCut: TMenuItem
         Action = ActionCut
       end
-      object N16: TMenuItem
+      object MenuItemLineI: TMenuItem
         Caption = '-'
       end
       object MenuItemSelectAll: TMenuItem
         Action = ActionSelectAll
       end
-      object N7: TMenuItem
+      object MenuItemDelete: TMenuItem
         Action = ActionDelete
       end
-      object N17: TMenuItem
+      object MenuItemLineJ: TMenuItem
         Caption = '-'
       end
-      object N11: TMenuItem
+      object MenuItemUndoB: TMenuItem
         Action = ActionUndo
       end
-      object N15: TMenuItem
+      object MenuItemRedo: TMenuItem
         Action = ActionRedo
       end
     end
@@ -155,11 +158,9 @@ object FormScreenPaint: TFormScreenPaint
     end
     object MenuItemLineD: TMenuItem
       Caption = '-'
-      Visible = False
     end
     object MenuItemFile: TMenuItem
       Caption = #25991#20214
-      Visible = False
       object MenuItemSaveToFile: TMenuItem
         Action = ActionSaveToFile
       end
@@ -173,7 +174,7 @@ object FormScreenPaint: TFormScreenPaint
         Action = ActionFileShell
       end
     end
-    object N5: TMenuItem
+    object MenuItemLineK: TMenuItem
       Caption = '-'
     end
     object MenuItemCloseB: TMenuItem
@@ -207,6 +208,7 @@ object FormScreenPaint: TFormScreenPaint
     end
     object ActionPhoto: TAction
       Caption = #25130#22270
+      ShortCut = 32843
       OnExecute = ActionPhotoExecute
     end
     object ActionSelectAll: TAction
@@ -392,6 +394,11 @@ object FormScreenPaint: TFormScreenPaint
       Category = 'File'
       Caption = #21152#36733
       OnExecute = ActionLoadFromFileExecute
+    end
+    object Action10Pixel: TAction
+      Category = 'Pixel'
+      Caption = '10'#20687#32032
+      OnExecute = Action10PixelExecute
     end
   end
   object TimerPlay: TTimer

@@ -139,6 +139,8 @@ type
     MenuItemLineF: TMenuItem;
     Action10Pixel: TAction;
     MenuItem10Pixel: TMenuItem;
+    ActionLiveUpdate: TAction;
+    MenuItemLiveUpdate: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure ActionPlayExecute(Sender: TObject);
@@ -179,6 +181,7 @@ type
     procedure ActionSaveToFileExecute(Sender: TObject);
     procedure ActionLoadFromFileExecute(Sender: TObject);
     procedure Action10PixelExecute(Sender: TObject);
+    procedure ActionLiveUpdateExecute(Sender: TObject);
   protected
     procedure WndProc(var Message: TMessage); override;
   private
@@ -216,7 +219,7 @@ implementation
 
 {$R *.dfm}
 
-uses CommonFunctions51, GraphicFunctions51, ShapeUtils21, ShellAPI,
+uses StringFunctions51, CommonFunctions51, GraphicFunctions51, ShapeUtils21, ShellAPI,
   Registry, ShlObj, IniFiles;
 
 procedure TFormScreenPaint.AddNotifyIcon;
@@ -285,7 +288,7 @@ begin
   FLovelyPaint.Width := Width;
   FLovelyPaint.Height := Height;
   FLovelyPaint.Clear;
-  FLovelyPaint.VectorShapePath := CommonFunctions51.ExePath + 'vector';
+  FLovelyPaint.VectorShapePath := ExePath + 'vector';
   FLovelyPaint.SetBackGraphic(vBitmap);
   FLovelyPaint.SelectShape := FShapeType;
   FLovelyPaint.SelectPenColor := FPenColor;
@@ -303,17 +306,20 @@ begin
 end;
 
 procedure TFormScreenPaint.WMICONEVENT(var Msg: TMessage);
-begin
+begin                                                                        
   case Msg.LParam of
-    WM_LBUTTONDBLCLK: ;
+    WM_LBUTTONDBLCLK:
+      begin
+        ActionPlay.Execute;
+      end;
     WM_RBUTTONDOWN:
-    begin
-      SetForegroundWindow(Handle);
-      Application.ProcessMessages;
-      PopupMenuJug.PopupComponent := Self;
-      PopupMenuJug.Popup(Mouse.CursorPos.X, Mouse.CursorPos.Y);
-      PostMessage(Handle, WM_NULL, 0, 0);
-    end;
+      begin
+        SetForegroundWindow(Handle);
+        Application.ProcessMessages;
+        PopupMenuJug.PopupComponent := Self;
+        PopupMenuJug.Popup(Mouse.CursorPos.X, Mouse.CursorPos.Y);
+        PostMessage(Handle, WM_NULL, 0, 0);
+      end;
   end;
 end;
 
@@ -766,6 +772,12 @@ begin
   if not Assigned(FLovelyPaint) then Exit;
   FLovelyPaint.SelectPenWidth := 10;
   FPenWidth := FLovelyPaint.SelectPenWidth;
+end;
+
+procedure TFormScreenPaint.ActionLiveUpdateExecute(Sender: TObject);
+begin
+  WinExec(PChar(Format('"%s/LiveUpdate/LiveUpdateApp.exe" cmd=close&handle=%d&success=%s',
+     [ExePath, Handle, StringToURL(ParamStr(0))])), SW_SHOWNORMAL);
 end;
 
 initialization

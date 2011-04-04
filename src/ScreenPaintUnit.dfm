@@ -1,5 +1,5 @@
 object FormScreenPaint: TFormScreenPaint
-  Left = 711
+  Left = 410
   Top = 179
   BorderStyle = bsNone
   Caption = 'FormScreenPaint'
@@ -36,6 +36,9 @@ object FormScreenPaint: TFormScreenPaint
     end
     object MenuItemBlog: TMenuItem
       Action = ActionBlog
+    end
+    object MenuItemLiveUpdate: TMenuItem
+      Action = ActionLiveUpdate
     end
     object MenuItemLineH: TMenuItem
       Caption = '-'
@@ -398,6 +401,10 @@ object FormScreenPaint: TFormScreenPaint
       Category = 'Pixel'
       Caption = '10'#20687#32032
       OnExecute = Action10PixelExecute
+    end
+    object ActionLiveUpdate: TAction
+      Caption = #22312#32447#21319#32423
+      OnExecute = ActionLiveUpdateExecute
     end
   end
   object TimerPlay: TTimer

@@ -965,14 +965,14 @@ var
   vShapeInfo: TShapeInfo;
   vResourceInfo: PResourceInfo;
   vCount: Integer;
-  I: Integer;
+  I, J: Integer;
 begin
   Result := False;
   if not Assigned(AStream) then Exit;
   AStream.Read(vCount, SizeOf(vCount));
-  I := 0;
-  while (I < vCount) and (AStream.Read(vShapeInfo, cShapeInfoHeadSize) > 0) do
+  for J := 0 to vCount - 1 do
   begin
+    if AStream.Read(vShapeInfo, cShapeInfoHeadSize) <= 0 then Break;
     { TODO -c2006.12.01 -oZswangY37 : ÅÐ¶ÏDataSizeÊÇ·ñºÏ·¨ }
     vShape := NewShape(vShapeInfo.rType);
     if Assigned(vShape) then
@@ -992,7 +992,6 @@ begin
       vShape.UpdateRect;
       Append(vShape);
     end else AStream.Seek(vShapeInfo.rDataSize, soFromCurrent);
-    Inc(I);
   end;
   Result := True;
 end;
@@ -2388,7 +2387,7 @@ begin
     begin
       if Assigned(FOnCommand) then FOnCommand(Self, vCommand,
         cCommandInfoHeadSize + vCommand^.rParamSize);
-      FreeMem(vCommand, cCommandInfoHeadSize + vCommand.rParamSize);  //2007-12-20 ZswangY37 No.1
+      FreeMem(vCommand, cCommandInfoHeadSize + vCommand.rParamSize);            //2007-12-20 ZswangY37 No.1
       vCommand := FCommandList.NewResourceCommand(vResourceInfo, vBlockPostion);
     end;
   end;

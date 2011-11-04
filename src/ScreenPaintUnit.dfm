@@ -165,6 +165,10 @@ object FormScreenPaint: TFormScreenPaint
     end
     object MenuItemFile: TMenuItem
       Caption = #25991#20214
+      object png1: TMenuItem
+        Action = ActionSaveToPng
+        Caption = #21098#36148#26495#23384'PNG'
+      end
       object MenuItemSaveToFile: TMenuItem
         Action = ActionSaveToFile
       end
@@ -406,6 +410,11 @@ object FormScreenPaint: TFormScreenPaint
       Caption = #22312#32447#21319#32423
       OnExecute = ActionLiveUpdateExecute
     end
+    object ActionSaveToPng: TAction
+      Category = 'File'
+      Caption = #23384#20026'png'
+      OnExecute = ActionSaveToPngExecute
+    end
   end
   object TimerPlay: TTimer
     Enabled = False
@@ -427,6 +436,12 @@ object FormScreenPaint: TFormScreenPaint
   object SaveDialogOne: TSaveDialog
     Filter = #23631#24149#30011#26495#25991#20214'(*.paint)|*.paint'
     Left = 216
+    Top = 8
+  end
+  object SavePictureDialogOne: TSavePictureDialog
+    Filter = 'Png (*.png)|*.png'
+    FilterIndex = 0
+    Left = 248
     Top = 8
   end
 end

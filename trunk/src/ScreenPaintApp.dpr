@@ -16,7 +16,10 @@ uses
   DibGraphic21 in 'DibGraphic21.pas',
   LovelyPanels21 in 'LovelyPanels21.pas',
   VectorSelectBoxUnit in 'VectorSelectBoxUnit.pas' {FormVectorSelectBox},
-  VertexButton21 in 'VertexButton21.pas';
+  VertexButton21 in 'VertexButton21.pas',
+  pngimage in '..\lib\PNGImage\pngimage.pas',
+  pnglang in '..\lib\PNGImage\pnglang.pas',
+  pngzlib in '..\lib\PNGImage\pngzlib.pas';
 
 {$R *.res}
 

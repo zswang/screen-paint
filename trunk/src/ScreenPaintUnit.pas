@@ -30,7 +30,7 @@ interface
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, Menus, ExtCtrls, LovelyPaint21, ActnList, StdActns, AppEvnts,
-  StdCtrls;
+  StdCtrls, ExtDlgs;
 
 const
   WM_ICONEVENT = WM_USER + 10; //托盘图标消息
@@ -141,6 +141,9 @@ type
     MenuItem10Pixel: TMenuItem;
     ActionLiveUpdate: TAction;
     MenuItemLiveUpdate: TMenuItem;
+    ActionSaveToPng: TAction;
+    SavePictureDialogOne: TSavePictureDialog;
+    png1: TMenuItem;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure ActionPlayExecute(Sender: TObject);
@@ -182,6 +185,7 @@ type
     procedure ActionLoadFromFileExecute(Sender: TObject);
     procedure Action10PixelExecute(Sender: TObject);
     procedure ActionLiveUpdateExecute(Sender: TObject);
+    procedure ActionSaveToPngExecute(Sender: TObject);
   protected
     procedure WndProc(var Message: TMessage); override;
   private
@@ -220,7 +224,7 @@ implementation
 {$R *.dfm}
 
 uses StringFunctions51, CommonFunctions51, GraphicFunctions51, ShapeUtils21, ShellAPI,
-  Registry, ShlObj, IniFiles;
+  Registry, ShlObj, IniFiles, PngImage, Clipbrd;
 
 procedure TFormScreenPaint.AddNotifyIcon;
 var
@@ -267,7 +271,7 @@ begin
   RegisterHotKey(Handle, cHotKeyWinP, MOD_WIN, VK_P);
   RegisterHotKey(Handle, cHotKeyWinZ, MOD_WIN, VK_Z);
   FRegistryShell := IsRegistryShell;
-  if FileExists(ParamStr(1)) then OpenFile(ParamStr(1)) else Play;
+  if FileExists(ParamStr(1)) then OpenFile(ParamStr(1));
 end;
 
 procedure TFormScreenPaint.ReloadScreen;
@@ -778,6 +782,33 @@ procedure TFormScreenPaint.ActionLiveUpdateExecute(Sender: TObject);
 begin
   WinExec(PChar(Format('"%s/LiveUpdate/LiveUpdateApp.exe" cmd=close&handle=%d&success=%s',
      [ExePath, Handle, StringToURL(ParamStr(0))])), SW_SHOWNORMAL);
+end;
+
+procedure TFormScreenPaint.ActionSaveToPngExecute(Sender: TObject);
+var
+  vBitmap: TBitmap;
+  vPngObject: TPNGObject;
+begin
+  if not Clipboard.HasFormat(CF_BITMAP) then Exit;
+  if not SavePictureDialogOne.Execute then Exit;
+  if ExtractFileExt(SavePictureDialogOne.FileName) = '' then
+    case SavePictureDialogOne.FilterIndex of
+      0, 1: SavePictureDialogOne.FileName := ChangeFileExt(SavePictureDialogOne.FileName,
+        '.png');
+    end;
+  if FileExists(SavePictureDialogOne.FileName) and
+    (MessageDlg(Format('文件"%s"已经存在，是否覆盖？',
+    [SavePictureDialogOne.FileName]), mtWarning, [mbYes, mbNo], 0) <> mrYes) then Exit;
+  vBitmap := TBitmap.Create;
+  vPngObject := TPNGObject.Create;
+  try
+    vBitmap.Assign(Clipboard);
+    vPngObject.Assign(vBitmap);
+    vPngObject.SaveToFile(SavePictureDialogOne.FileName);
+  finally
+    vBitmap.Free;
+    vPngObject.Free;
+  end;
 end;
 
 initialization
